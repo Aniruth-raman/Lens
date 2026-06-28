@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Lens",
+    "slug": "Lens",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Lens needs camera access to scan documents.",
+        "NSPhotoLibraryUsageDescription": "Lens needs photo library access to save scanned documents."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0a0a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "Lens needs camera access to scan documents."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5bf9fe07-f9bb-4c47-98c0-7e3b59dbd652"
+      }
+    }
+  }
+}
