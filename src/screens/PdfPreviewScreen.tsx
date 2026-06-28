@@ -7,6 +7,8 @@ import {
   Alert,
   StatusBar,
   Platform,
+  FlatList,
+  Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -19,24 +21,31 @@ type RoutePropType = RouteProp<RootStackParamList, 'PdfPreview'>;
 export default function PdfPreviewScreen() {
   const navigation = useNavigation();
   const route = useRoute<RoutePropType>();
-  const { pdfUri, docName } = route.params;
+  const { pdfUri, imageUris, docName } = route.params;
 
-  const { sharePdf } = usePdfExport();
+  const { shareFile } = usePdfExport();
 
   const handleShare = useCallback(async () => {
     try {
-      await sharePdf(pdfUri);
-    } catch (e) {
-      Alert.alert('Share failed', 'Could not share the PDF.');
-    }
-  }, [pdfUri, sharePdf]);
+      if (pdfUri) {
+        await shareFile(pdfUri, 'application/pdf');
+        return;
+      }
 
-  // On iOS, WebView can render PDFs directly from file://
-  // On Android, we embed with Google Docs viewer as fallback
-  const source =
-    Platform.OS === 'ios'
+      if (imageUris && imageUris.length > 0) {
+        await shareFile(imageUris[0], 'image/jpeg');
+      }
+    } catch (e) {
+      Alert.alert('Share failed', 'Could not share the file.');
+    }
+  }, [pdfUri, imageUris, shareFile]);
+
+  const showingPdf = !!pdfUri;
+  const source = showingPdf
+    ? Platform.OS === 'ios'
       ? { uri: pdfUri }
-      : { uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUri)}` };
+      : { uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUri || '')}` }
+    : null;
 
   return (
     <View style={styles.container}>
@@ -53,25 +62,38 @@ export default function PdfPreviewScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* PDF viewer */}
-      <WebView
-        source={source}
-        style={styles.webview}
-        originWhitelist={['*']}
-        allowFileAccess
-        allowUniversalAccessFromFileURLs
-        startInLoadingState
-        renderLoading={() => (
-          <View style={styles.loading}>
-            <Text style={styles.loadingText}>Loading PDF...</Text>
-          </View>
-        )}
-      />
+      {showingPdf ? (
+        <WebView
+          source={source}
+          style={styles.webview}
+          originWhitelist={['*']}
+          allowFileAccess
+          allowUniversalAccessFromFileURLs
+          startInLoadingState
+          renderLoading={() => (
+            <View style={styles.loading}>
+              <Text style={styles.loadingText}>Loading PDF...</Text>
+            </View>
+          )}
+        />
+      ) : (
+        <FlatList
+          data={imageUris || []}
+          keyExtractor={(_, index) => String(index)}
+          contentContainerStyle={styles.imageList}
+          renderItem={({ item, index }) => (
+            <View style={styles.imageCard}>
+              <Image source={{ uri: item }} style={styles.image} resizeMode="contain" />
+              <Text style={styles.pageLabel}>Page {index + 1}</Text>
+            </View>
+          )}
+        />
+      )}
 
       {/* Bottom action */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.shareFooterBtn} onPress={handleShare} activeOpacity={0.85}>
-          <Text style={styles.shareFooterBtnText}>Share PDF ↑</Text>
+          <Text style={styles.shareFooterBtnText}>{showingPdf ? 'Share PDF ↑' : 'Share Image ↑'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.doneBtn}
@@ -125,6 +147,29 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  imageList: {
+    padding: spacing.lg,
+    paddingBottom: 24,
+    gap: spacing.lg,
+  },
+  imageCard: {
+    minHeight: 360,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  image: {
+    width: '100%',
+    height: 320,
+  },
+  pageLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: spacing.sm,
   },
   loading: {
     position: 'absolute',

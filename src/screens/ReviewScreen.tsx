@@ -30,8 +30,9 @@ export default function ReviewScreen() {
 
   const [pages, setPages] = useState<string[]>(initialImages);
   const [docName, setDocName] = useState(`Scan ${new Date().toLocaleDateString('en-IN')}`);
+  const [savingMode, setSavingMode] = useState<'pdf' | 'images' | null>(null);
 
-  const { exportToPdf, exporting } = usePdfExport();
+  const { exportToPdf, exportAsImages, exporting } = usePdfExport();
   const { saveDoc } = useScannedDocs();
 
   const removePage = useCallback((index: number) => {
@@ -42,32 +43,40 @@ export default function ReviewScreen() {
     setPages((prev) => prev.filter((_, i) => i !== index));
   }, [pages]);
 
-  const handleExport = useCallback(async () => {
-    if (!docName.trim()) {
+  const handleSave = useCallback(async (mode: 'pdf' | 'images') => {
+    const name = docName.trim();
+    if (!name) {
       Alert.alert('Name required', 'Please enter a name for this document.');
       return;
     }
 
+    setSavingMode(mode);
     try {
-      const pdfUri = await exportToPdf(pages, docName.trim());
-
-      const doc = {
+      const baseDoc = {
         id: Date.now().toString(),
-        name: docName.trim(),
-        pdfUri,
+        name,
         thumbUri: pages[0],
         pageCount: pages.length,
         createdAt: Date.now(),
       };
 
-      await saveDoc(doc);
+      if (mode === 'pdf') {
+        const pdfUri = await exportToPdf(pages, name);
+        await saveDoc({ ...baseDoc, pdfUri });
+        navigation.navigate('PdfPreview', { pdfUri, docName: name });
+        return;
+      }
 
-      navigation.navigate('PdfPreview', { pdfUri, docName: docName.trim() });
+      const imageUris = await exportAsImages(pages, name);
+      await saveDoc({ ...baseDoc, imageUris });
+      navigation.navigate('PdfPreview', { imageUris, docName: name });
     } catch (e) {
-      Alert.alert('Export failed', 'Something went wrong while creating the PDF.');
+      Alert.alert('Save failed', 'Something went wrong while saving the scan.');
       console.error(e);
+    } finally {
+      setSavingMode(null);
     }
-  }, [pages, docName, exportToPdf, saveDoc, navigation]);
+  }, [pages, docName, exportToPdf, exportAsImages, saveDoc, navigation]);
 
   return (
     <KeyboardAvoidingView
@@ -126,14 +135,26 @@ export default function ReviewScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          onPress={handleExport}
+          onPress={() => handleSave('pdf')}
           disabled={exporting}
           activeOpacity={0.85}
         >
-          {exporting ? (
+          {exporting && savingMode === 'pdf' ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.exportBtnText}>Export as PDF →</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.imageBtn, exporting && styles.exportBtnDisabled]}
+          onPress={() => handleSave('images')}
+          disabled={exporting}
+          activeOpacity={0.85}
+        >
+          {exporting && savingMode === 'images' ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : (
+            <Text style={styles.imageBtnText}>Save as Images</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -253,6 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    gap: spacing.sm,
   },
   exportBtn: {
     backgroundColor: colors.accent,
@@ -268,6 +290,21 @@ const styles = StyleSheet.create({
   exportBtnText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  imageBtn: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  imageBtnText: {
+    color: colors.accent,
+    fontSize: 15,
     fontWeight: '600',
   },
 });

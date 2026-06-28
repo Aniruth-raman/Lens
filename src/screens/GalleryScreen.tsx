@@ -35,7 +35,11 @@ export default function GalleryScreen() {
 
   const openDoc = useCallback(
     (doc: ScannedDoc) => {
-      navigation.navigate('PdfPreview', { pdfUri: doc.pdfUri, docName: doc.name });
+      navigation.navigate('PdfPreview', {
+        pdfUri: doc.pdfUri,
+        imageUris: doc.imageUris,
+        docName: doc.name,
+      });
     },
     [navigation]
   );
