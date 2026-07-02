@@ -1,22 +1,24 @@
-import React, { useCallback } from 'react';
+import React, { useCallback } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Alert,
   StatusBar,
-  Platform,
   FlatList,
   Image,
-} from 'react-native';
-import { WebView } from 'react-native-webview';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { usePdfExport } from '../hooks/usePdfExport';
-import { colors, spacing, radius } from '../utils/theme';
-import { RootStackParamList } from '../types';
+  KeyboardAvoidingView,
+} from "react-native";
+import Pdf from "react-native-pdf";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { usePdfExport } from "../hooks/usePdfExport";
+import tailwindConfig from "../../tailwind.config";
+import { RootStackParamList } from "../types";
 
-type RoutePropType = RouteProp<RootStackParamList, 'PdfPreview'>;
+const { colors } = tailwindConfig;
+import { SafeAreaView } from "react-native-safe-area-context";
+
+type RoutePropType = RouteProp<RootStackParamList, "PdfPreview">;
 
 export default function PdfPreviewScreen() {
   const navigation = useNavigation();
@@ -28,51 +30,51 @@ export default function PdfPreviewScreen() {
   const handleShare = useCallback(async () => {
     try {
       if (pdfUri) {
-        await shareFile(pdfUri, 'application/pdf');
+        await shareFile(pdfUri, "application/pdf");
         return;
       }
 
       if (imageUris && imageUris.length > 0) {
-        await shareFile(imageUris[0], 'image/jpeg');
+        await shareFile(imageUris[0], "image/jpeg");
       }
     } catch (e) {
-      Alert.alert('Share failed', 'Could not share the file.');
+      Alert.alert("Share failed", "Could not share the file.");
     }
   }, [pdfUri, imageUris, shareFile]);
 
   const showingPdf = !!pdfUri;
-  const source = showingPdf
-    ? Platform.OS === 'ios'
-      ? { uri: pdfUri }
-      : { uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUri || '')}` }
-    : null;
+  const source = showingPdf ? { uri: pdfUri } : null;
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView className="flex-1 bg-bg">
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+      <View className="flex-row items-center pt-14 px-6 pb-4 border-b border-border">
+        <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
+          <Text className="text-accent text-xl font-bold">← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{docName}</Text>
-        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-          <Text style={styles.shareBtnText}>Share ↑</Text>
+        <Text
+          className="flex-1 text-primary text-xl font-bold"
+          numberOfLines={1}
+        >
+          {docName}
+        </Text>
+        <TouchableOpacity className="px-2 py-1" onPress={handleShare}>
+          <Text className="text-accent text-xl font-bold">Share ↑</Text>
         </TouchableOpacity>
       </View>
 
       {showingPdf ? (
-        <WebView
+        <Pdf
           source={source}
-          style={styles.webview}
-          originWhitelist={['*']}
+          style={{ flex: 1, backgroundColor: colors.bg }}
+          originWhitelist={["*"]}
           allowFileAccess
           allowUniversalAccessFromFileURLs
           startInLoadingState
           renderLoading={() => (
-            <View style={styles.loading}>
-              <Text style={styles.loadingText}>Loading PDF...</Text>
+            <View className="absolute inset-0 items-center justify-center bg-bg">
+              <Text className="text-muted text-sm">Loading PDF...</Text>
             </View>
           )}
         />
@@ -80,143 +82,41 @@ export default function PdfPreviewScreen() {
         <FlatList
           data={imageUris || []}
           keyExtractor={(_, index) => String(index)}
-          contentContainerStyle={styles.imageList}
+          contentContainerClassName="p-6 pb-6 gap-6"
           renderItem={({ item, index }) => (
-            <View style={styles.imageCard}>
-              <Image source={{ uri: item }} style={styles.image} resizeMode="contain" />
-              <Text style={styles.pageLabel}>Page {index + 1}</Text>
+            <View className="min-h-[360px] rounded-md overflow-hidden bg-surface border border-border">
+              <Image
+                source={{ uri: item }}
+                className="w-full h-80"
+                resizeMode="contain"
+              />
+              <Text className="text-muted text-xs text-center py-2">
+                Page {index + 1}
+              </Text>
             </View>
           )}
         />
       )}
 
       {/* Bottom action */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.shareFooterBtn} onPress={handleShare} activeOpacity={0.85}>
-          <Text style={styles.shareFooterBtnText}>{showingPdf ? 'Share PDF ↑' : 'Share Image ↑'}</Text>
-        </TouchableOpacity>
+      <SafeAreaView className="flex-row gap-3 p-6 border-t border-border bg-bg">
         <TouchableOpacity
-          style={styles.doneBtn}
-          onPress={() => navigation.navigate('Gallery' as never)}
+          className="flex-1 border border-accent rounded-md p-4 items-center justify-center h-[52px]"
+          onPress={handleShare}
           activeOpacity={0.85}
         >
-          <Text style={styles.doneBtnText}>Done</Text>
+          <Text className="text-accent text-[15px] font-semibold">
+            {showingPdf ? "Share PDF ↑" : "Share Image ↑"}
+          </Text>
         </TouchableOpacity>
-      </View>
-    </View>
+        <TouchableOpacity
+          className="flex-1 bg-accent rounded-md p-4 items-center justify-center h-[52px]"
+          onPress={() => navigation.navigate("Gallery" as never)}
+          activeOpacity={0.85}
+        >
+          <Text className="text-white text-[15px] font-semibold">Done</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 56,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backBtn: {
-    marginRight: spacing.sm,
-  },
-  backText: {
-    color: colors.accent,
-    fontSize: 15,
-  },
-  headerTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
-    marginHorizontal: spacing.sm,
-  },
-  shareBtn: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  shareBtnText: {
-    color: colors.accentLight,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  imageList: {
-    padding: spacing.lg,
-    paddingBottom: 24,
-    gap: spacing.lg,
-  },
-  imageCard: {
-    minHeight: 360,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  image: {
-    width: '100%',
-    height: 320,
-  },
-  pageLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    textAlign: 'center',
-    paddingVertical: spacing.sm,
-  },
-  loading: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg,
-  },
-  loadingText: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-  shareFooterBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-  },
-  shareFooterBtnText: {
-    color: colors.accent,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  doneBtn: {
-    flex: 1,
-    backgroundColor: colors.accent,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-  },
-  doneBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
