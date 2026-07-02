@@ -6,23 +6,29 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import DocumentScanner from "react-native-document-scanner-plugin";
 import DocumentCard from "../components/DocumentCard";
-import { useScannedDocs } from "../hooks/useScannedDocs";
+import { useDocumentsStore } from "../store/documentsStore";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList, ScannedDoc } from "../types";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { colors } = tailwindConfig;
-import { SafeAreaView } from "react-native-safe-area-context";
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, "Gallery">;
 
 export default function GalleryScreen() {
   const navigation = useNavigation<NavProp>();
-  const { docs, loading, deleteDoc } = useScannedDocs();
+
+  // Shared store — same data whichever screen reads it, no isolated
+  // per-screen copies that can drift out of sync.
+  const docs = useDocumentsStore((s) => s.docs);
+  const loading = useDocumentsStore((s) => s.loading);
+  const deleteDoc = useDocumentsStore((s) => s.deleteDoc);
 
   const startScan = useCallback(async () => {
     try {
@@ -34,21 +40,38 @@ export default function GalleryScreen() {
       }
     } catch (e) {
       console.error("Scan failed:", e);
+      Alert.alert(
+        "Scan failed",
+        "Could not open the document scanner. Please try again.",
+      );
     }
   }, [navigation]);
 
   const openDoc = useCallback(
     (doc: ScannedDoc) => {
-      navigation.navigate("PdfPreview", {
-        id: doc.id,
-        pdfUri: doc.pdfUri,
-        imageUris: doc.imageUris,
-        docName: doc.name,
-        thumbUri: doc.thumbUri,
-        pageCount: doc.pageCount,
-      });
+      // Only the id crosses the navigation boundary — PdfPreviewScreen
+      // reads everything else straight from the store.
+      navigation.navigate("PdfPreview", { id: doc.id });
     },
     [navigation],
+  );
+
+  const confirmDelete = useCallback(
+    (doc: ScannedDoc) => {
+      Alert.alert(
+        "Delete document?",
+        `"${doc.name}" will be removed from Lens.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => deleteDoc(doc.id),
+          },
+        ],
+      );
+    },
+    [deleteDoc],
   );
 
   if (loading) {
@@ -78,9 +101,12 @@ export default function GalleryScreen() {
         numColumns={2}
         className="flex-1"
         contentContainerClassName="px-8 pt-8 pb-24"
-        columnWrapperClassName={docs.length > 0 ? "gap-x-4" : undefined}
         renderItem={({ item }) => (
-          <DocumentCard doc={item} onOpen={openDoc} onDelete={deleteDoc} />
+          <DocumentCard
+            doc={item}
+            onPress={() => openDoc(item)}
+            onDeletePress={() => confirmDelete(item)}
+          />
         )}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center pt-64 px-8">

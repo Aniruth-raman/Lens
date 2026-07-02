@@ -1,11 +1,11 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity, Alert } from "react-native";
+import { View, Text, Image, TouchableOpacity } from "react-native";
 import { ScannedDoc } from "../types";
 
 type Props = {
   doc: ScannedDoc;
-  onOpen: (doc: ScannedDoc) => void;
-  onDelete: (id: string) => void;
+  onPress: () => void;
+  onDeletePress: () => void;
 };
 
 function formatDate(ts: number): string {
@@ -16,29 +16,13 @@ function formatDate(ts: number): string {
   });
 }
 
-export default function DocumentCard({ doc, onOpen, onDelete }: Props) {
-  const confirmDelete = () => {
-    Alert.alert(
-      "Delete document?",
-      `"${doc.name}" will be removed permanently.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => onDelete(doc.id),
-        },
-      ],
-    );
-  };
-
+export default function DocumentCard({ doc, onPress, onDeletePress }: Props) {
   return (
     <TouchableOpacity
       className="flex-1 m-2 bg-surface rounded-md overflow-hidden border border-border"
-      onPress={() => onOpen(doc)}
+      onPress={onPress}
       activeOpacity={0.8}
     >
-      {/* Thumbnail */}
       <View className="h-[180px] bg-surface-alt relative">
         {doc.thumbUri ? (
           <Image
@@ -58,7 +42,6 @@ export default function DocumentCard({ doc, onOpen, onDelete }: Props) {
         </View>
       </View>
 
-      {/* Info row */}
       <View className="p-2">
         <Text
           className="text-primary text-[13px] font-semibold mb-0.5"
@@ -71,10 +54,9 @@ export default function DocumentCard({ doc, onOpen, onDelete }: Props) {
         </Text>
       </View>
 
-      {/* Delete button */}
       <TouchableOpacity
         className="absolute top-2 right-2 bg-black/60 w-6 h-6 rounded-full items-center justify-center"
-        onPress={confirmDelete}
+        onPress={onDeletePress}
         hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
       >
         <Text className="text-white text-[11px] font-bold">✕</Text>
