@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { File } from 'expo-file-system';
 import { ScannedDoc } from '../types';
 
 const STORAGE_KEY = 'lens_docs';
@@ -24,21 +23,17 @@ export function useScannedDocs() {
 
   const saveDoc = useCallback(
     async (doc: ScannedDoc) => {
-      const updated = [doc, ...docs];
+      const existing = docs.find((item) => item.id === doc.id);
+      const mergedDoc = existing ? { ...existing, ...doc } : doc;
+      const updated = [mergedDoc, ...docs.filter((item) => item.id !== doc.id)];
       await persist(updated);
+      return mergedDoc;
     },
     [docs]
   );
 
   const deleteDoc = useCallback(
     async (id: string) => {
-      const target = docs.find((d) => d.id === id);
-      if (target) {
-        try {
-          const file = new File(target.pdfUri);
-          if (file.exists) file.delete();
-        } catch (_) {}
-      }
       const updated = docs.filter((d) => d.id !== id);
       await persist(updated);
     },

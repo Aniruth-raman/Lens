@@ -11,5 +11,12 @@ export type ScannedDoc = {
 export type RootStackParamList = {
   Gallery: undefined;
   Review: { images: string[] };
-  PdfPreview: { docName: string; pdfUri?: string; imageUris?: string[] };
+  PdfPreview: {
+    id: string;
+    docName: string;
+    thumbUri: string;
+    pageCount: number;
+    pdfUri?: string;
+    imageUris?: string[];
+  };
 };

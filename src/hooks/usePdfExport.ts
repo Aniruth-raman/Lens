@@ -1,11 +1,8 @@
 import { useCallback, useState } from 'react';
+import { Platform } from 'react-native';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { Paths, Directory, File } from 'expo-file-system';
-
-function safeName(value: string): string {
-  return value.trim().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'scan';
-}
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
 function mimeTypeFor(file: File): string {
   const extension = (file.extension || '').toLowerCase().replace(/^\./, '');
@@ -18,6 +15,33 @@ function mimeTypeFor(file: File): string {
 async function toDataUri(uri: string): Promise<string> {
   const file = new File(uri);
   return `data:${mimeTypeFor(file)};base64,${await file.base64()}`;
+}
+
+async function persistScanPages(imageUris: string[], id: string): Promise<string[]> {
+  const scansDir = new Directory(Paths.document, "scans");
+  scansDir.create({ intermediates: true, idempotent: true });
+
+  const docDir = new Directory(scansDir, id);
+  if (docDir.exists) docDir.delete();
+  docDir.create({ intermediates: true, idempotent: true });
+
+  return await Promise.all(
+    imageUris.map(async (uri, index) => {
+      const source = new File(uri);
+      const ext = (source.extension || ".jpg").replace(/^\./, "") || "jpg";
+      const destFile = new File(docDir, `page-${index + 1}.${ext}`);
+      await source.copy(destFile);
+      return destFile.uri;
+    })
+  );
+}
+
+function toLocalPath(uri: string): string {
+  return uri.startsWith('file://') ? uri.replace(/^file:\/\//, '') : uri;
+}
+
+function safeFileName(name: string): string {
+  return name.trim().replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'scan';
 }
 
 function buildHtml(imageUris: string[], docName: string): string {
@@ -62,21 +86,45 @@ function buildHtml(imageUris: string[], docName: string): string {
 </html>`;
 }
 
-export function usePdfExport() {
+type PdfExportHook = {
+  exportToPdf: (imageUris: string[], docName: string, id: string) => Promise<string>;
+  exportAsImages: (imageUris: string[], docName: string, id: string) => Promise<string[]>;
+  saveScanPages: (imageUris: string[], id: string) => Promise<string[]>;
+  exporting: boolean;
+};
+
+export function usePdfExport(): PdfExportHook {
   const [exporting, setExporting] = useState(false);
 
+  const saveScanPages = useCallback(async (imageUris: string[], id: string) => {
+    return await persistScanPages(imageUris, id);
+  }, []);
+
   const exportToPdf = useCallback(
-    async (imageUris: string[], docName: string): Promise<string> => {
+    async (imageUris: string[], docName: string, id: string): Promise<string> => {
       setExporting(true);
       try {
         const html = buildHtml(await Promise.all(imageUris.map(toDataUri)), docName);
         const { uri: tmpUri } = await Print.printToFileAsync({ html });
 
+        if (Platform.OS === 'android') {
+          return ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
+            {
+              name: `${safeFileName(docName)}-${id}.pdf`,
+              parentFolder: 'Lens/scans',
+              mimeType: 'application/pdf',
+            },
+            'Download',
+            toLocalPath(tmpUri),
+          );
+        }
+
         const scansDir = new Directory(Paths.document, 'scans');
         scansDir.create({ intermediates: true, idempotent: true });
 
-        const fileName = `${safeName(docName)}_${Date.now()}.pdf`;
-        const destFile = new File(scansDir, fileName);
+        const destFile = new File(scansDir, `${id}.pdf`);
+        // overwrite if this id was already exported before (re-save)
+        if (destFile.exists) destFile.delete();
         await new File(tmpUri).move(destFile);
 
         return destFile.uri;
@@ -88,13 +136,42 @@ export function usePdfExport() {
   );
 
   const exportAsImages = useCallback(
-    async (imageUris: string[], docName: string): Promise<string[]> => {
+    async (imageUris: string[], docName: string, id: string): Promise<string[]> => {
       setExporting(true);
       try {
+        if (Platform.OS === 'android') {
+          return await Promise.all(
+            imageUris.map(async (uri, index) => {
+              const source = new File(uri);
+              const ext = (source.extension || '.jpg').replace(/^\./, '') || 'jpg';
+
+              return ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
+                {
+                  name: `${safeFileName(docName)}-${id}-page-${index + 1}.${ext}`,
+                  parentFolder: `Lens/scans/${id}`,
+                  mimeType: mimeTypeFor(source),
+                },
+                'Image',
+                toLocalPath(uri),
+              );
+            })
+          );
+        }
+
         const scansDir = new Directory(Paths.document, 'scans');
         scansDir.create({ intermediates: true, idempotent: true });
 
-        const docDir = new Directory(scansDir, `${safeName(docName)}_${Date.now()}`);
+        const docDir = new Directory(scansDir, id);
+        const docDirUri = docDir.uri.endsWith('/') ? docDir.uri : `${docDir.uri}/`;
+
+        // If the images already live in the target folder, reusing them avoids
+        // deleting the source before we have a chance to copy it.
+        if (imageUris.length > 0 && imageUris.every((uri) => uri.startsWith(docDirUri))) {
+          return imageUris;
+        }
+
+        // clear out a stale prior export for this id before writing fresh pages
+        if (docDir.exists) docDir.delete();
         docDir.create({ intermediates: true, idempotent: true });
 
         return await Promise.all(
@@ -106,7 +183,9 @@ export function usePdfExport() {
             try {
               await source.copy(destFile);
             } catch {
-              destFile.write(await source.bytes());
+              if (source.exists) {
+                destFile.write(await source.bytes());
+              }
             }
 
             return destFile.uri;
@@ -119,15 +198,5 @@ export function usePdfExport() {
     []
   );
 
-  const shareFile = useCallback(async (uri: string, mimeType: string) => {
-    const available = await Sharing.isAvailableAsync();
-    if (!available) throw new Error('Sharing is not available on this device');
-    await Sharing.shareAsync(uri, {
-      mimeType,
-      dialogTitle: 'Share file',
-      UTI: mimeType === 'application/pdf' ? 'com.adobe.pdf' : undefined,
-    });
-  }, []);
-
-  return { exportToPdf, exportAsImages, shareFile, exporting };
+  return { exportToPdf, exportAsImages, saveScanPages, exporting };
 }
