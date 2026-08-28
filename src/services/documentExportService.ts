@@ -1,7 +1,38 @@
 import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
+import { Platform } from "react-native";
+import ReactNativeBlobUtil from "react-native-blob-util";
 import { Paths, Directory, File } from "expo-file-system";
 import { buildDocumentHtml } from "./documentHtml";
+
+function safeFileName(name: string): string {
+  return (
+    name
+      .trim()
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "scan"
+  );
+}
+
+function toLocalPath(uri: string): string {
+  return uri.startsWith("file://") ? uri.replace(/^file:\/\//, "") : uri;
+}
+
+// Android only: copies an already-persisted app-private file into the
+// public MediaStore (Downloads/Pictures) so it's visible outside the app,
+// without disturbing the private copy the app itself reads for preview.
+async function publishToMediaStore(
+  localFile: File,
+  displayName: string,
+  parentFolder: string,
+  mimeType: string,
+  collection: "Download" | "Image",
+): Promise<void> {
+  await ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
+    { name: displayName, parentFolder, mimeType },
+    collection,
+    toLocalPath(localFile.uri),
+  );
+}
 
 function mimeTypeFor(file: File): string {
   const extension = (file.extension || "").toLowerCase().replace(/^\./, "");
@@ -22,10 +53,6 @@ function scansDirFor(): Directory {
 
 function sourceDirFor(id: string): Directory {
   return new Directory(scansDirFor(), id, "source");
-}
-
-export function pdfPathFor(id: string): string {
-  return new File(scansDirFor(), `${id}.pdf`).uri;
 }
 
 // The scanned page images for a document are persisted exactly once, the
@@ -88,21 +115,46 @@ export async function generatePdf(
   if (destFile.exists) destFile.delete();
   await new File(tmpUri).move(destFile);
 
+  // The app keeps reading destFile (private) for in-app preview. This just
+  // additionally makes the same content visible to the user outside the
+  // app. iOS already gets equivalent visibility via Files-app entitlements
+  // on Paths.document (see app.json), so no extra step is needed there.
+  if (Platform.OS === "android") {
+    await publishToMediaStore(
+      destFile,
+      `${safeFileName(docName)}.pdf`,
+      "Lens",
+      "application/pdf",
+      "Download",
+    );
+  }
+
   return destFile.uri;
 }
 
 // Images ARE the persisted source pages — nothing extra to generate, just
 // ensure the source exists and hand back its file URIs.
-export async function generateImages(id: string, pages?: string[]): Promise<string[]> {
-  return ensureSourcePages(id, pages);
-}
+export async function generateImages(
+  id: string,
+  docName: string,
+  pages?: string[],
+): Promise<string[]> {
+  const uris = await ensureSourcePages(id, pages);
 
-export async function shareExportedFile(uri: string, mimeType: string): Promise<void> {
-  const available = await Sharing.isAvailableAsync();
-  if (!available) throw new Error("Sharing is not available on this device");
-  await Sharing.shareAsync(uri, {
-    mimeType,
-    dialogTitle: "Share file",
-    UTI: mimeType === "application/pdf" ? "com.adobe.pdf" : undefined,
-  });
+  if (Platform.OS === "android") {
+    await Promise.all(
+      uris.map((uri, index) => {
+        const file = new File(uri);
+        return publishToMediaStore(
+          file,
+          `${safeFileName(docName)}-page-${index + 1}${file.extension || ".jpg"}`,
+          "Lens",
+          mimeTypeFor(file),
+          "Image",
+        );
+      }),
+    );
+  }
+
+  return uris;
 }

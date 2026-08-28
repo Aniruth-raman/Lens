@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { generatePdf, generateImages, shareExportedFile } from "../services/documentExportService";
+import { generatePdf, generateImages } from "../services/documentExportService";
 
 // Intentionally thin: all real logic lives in documentExportService.ts.
 // This hook's only job is exposing an `exporting` boolean for screens that
@@ -20,18 +20,17 @@ export function useDocumentExport() {
     [],
   );
 
-  const exportAsImages = useCallback(async (id: string, pages?: string[]) => {
-    setExporting(true);
-    try {
-      return await generateImages(id, pages);
-    } finally {
-      setExporting(false);
-    }
-  }, []);
+  const exportAsImages = useCallback(
+    async (id: string, docName: string, pages?: string[]) => {
+      setExporting(true);
+      try {
+        return await generateImages(id, docName, pages);
+      } finally {
+        setExporting(false);
+      }
+    },
+    [],
+  );
 
-  const shareFile = useCallback(async (uri: string, mimeType: string) => {
-    await shareExportedFile(uri, mimeType);
-  }, []);
-
-  return { exportToPdf, exportAsImages, shareFile, exporting };
+  return { exportToPdf, exportAsImages, exporting };
 }

@@ -8,12 +8,12 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import Pdf from "react-native-pdf";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useDocumentsStore } from "../store/documentsStore";
-import { useDocumentExport } from "../hooks/useDocumentExport";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList } from "../types";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,7 +33,6 @@ export default function PdfPreviewScreen() {
   const doc = useDocumentsStore((s) => s.docs.find((d) => d.id === id));
   const reExportPdf = useDocumentsStore((s) => s.reExportPdf);
   const reExportImages = useDocumentsStore((s) => s.reExportImages);
-  const { shareFile } = useDocumentExport();
 
   const [activeTab, setActiveTab] = useState<"pdf" | "images">(
     doc?.pdfUri ? "pdf" : "images",
@@ -41,23 +40,6 @@ export default function PdfPreviewScreen() {
   const [addingFormat, setAddingFormat] = useState<"pdf" | "images" | null>(
     null,
   );
-
-  const handleShare = useCallback(async () => {
-    if (!doc) return;
-    try {
-      if (activeTab === "pdf" && doc.pdfUri) {
-        await shareFile(doc.pdfUri, "application/pdf");
-      } else if (
-        activeTab === "images" &&
-        doc.imageUris &&
-        doc.imageUris.length > 0
-      ) {
-        await shareFile(doc.imageUris[0], "image/jpeg");
-      }
-    } catch (e) {
-      Alert.alert("Share failed", "Could not share the file.");
-    }
-  }, [doc, activeTab, shareFile]);
 
   const handleAddFormat = useCallback(
     async (mode: "pdf" | "images") => {
@@ -237,17 +219,18 @@ export default function PdfPreviewScreen() {
         </View>
       )}
 
-      {/* Single share action, reflecting whichever format is active */}
+      {/* Export already saved the file to user-visible storage — this just
+          confirms where, rather than offering a share sheet. */}
       <SafeAreaView className="p-6 border-t border-border bg-bg">
-        <TouchableOpacity
-          className="bg-accent rounded-md p-4 items-center justify-center h-[52px]"
-          onPress={handleShare}
-          activeOpacity={0.85}
-        >
-          <Text className="text-white text-[15px] font-semibold">
-            {activeTab === "pdf" ? "Share PDF ↑" : "Share Image ↑"}
+        <View className="rounded-md p-4 items-center justify-center bg-surface border border-border">
+          <Text className="text-primary text-[15px] font-semibold">
+            {Platform.OS === "android"
+              ? activeTab === "pdf"
+                ? "Saved to Downloads/Lens"
+                : "Saved to Pictures/Lens"
+              : "Saved — Files app → On My iPhone → Lens"}
           </Text>
-        </TouchableOpacity>
+        </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

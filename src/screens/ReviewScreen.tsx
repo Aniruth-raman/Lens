@@ -38,9 +38,21 @@ export default function ReviewScreen() {
   const exporting = useDocumentsStore((s) => s.exporting);
 
   const [pages, setPages] = useState<string[]>(initialImages);
-  const [docName, setDocName] = useState(
-    `Scan ${new Date().toLocaleDateString("en-IN")}`,
-  );
+  const [docName, setDocName] = useState(() => {
+    const now = new Date()
+      .toLocaleString("en-IN", {
+        hour12: false,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+      .replace(/\D/g, "");
+
+    return `Scan ${now}`;
+  });
   const [savingMode, setSavingMode] = useState<"pdf" | "images" | null>(null);
 
   const removePage = useCallback((index: number) => {

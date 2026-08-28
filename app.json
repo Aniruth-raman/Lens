@@ -10,7 +10,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Lens needs camera access to scan documents.",
-        "NSPhotoLibraryUsageDescription": "Lens needs photo library access to save scanned documents."
+        "NSPhotoLibraryUsageDescription": "Lens needs photo library access to save scanned documents.",
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
       }
     },
     "android": {

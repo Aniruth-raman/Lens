@@ -86,7 +86,7 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
       if (exportMode === "pdf") {
         doc.pdfUri = await generatePdf(id, name, imageUris);
       } else {
-        doc.imageUris = await generateImages(id, imageUris);
+        doc.imageUris = await generateImages(id, name, imageUris);
       }
 
       const updated = [doc, ...get().docs];
@@ -121,7 +121,7 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => ({
 
     set({ exporting: true });
     try {
-      const imageUris = await generateImages(id);
+      const imageUris = await generateImages(id, target.name);
       const updated = get().docs.map((d) =>
         d.id === id ? { ...d, imageUris, updatedAt: Date.now() } : d,
       );
