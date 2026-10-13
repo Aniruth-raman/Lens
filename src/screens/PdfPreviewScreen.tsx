@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -38,7 +38,7 @@ export default function PdfPreviewScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(doc?.pageCount || 1);
 
-  const handleSharePdf = useCallback(async () => {
+  const handleSharePdf = async () => {
     if (!doc?.pdfUri) {
       Alert.alert(
         "PDF not found",
@@ -69,9 +69,9 @@ export default function PdfPreviewScreen() {
     } finally {
       setSharing(false);
     }
-  }, [doc]);
+  };
 
-  const handleAddAnotherFormat = useCallback(async () => {
+  const handleAddAnotherFormat = async () => {
     if (!doc) return;
     const needsPdf = !doc.pdfUri;
     const needsImages = !doc.imageUris || doc.imageUris.length === 0;
@@ -101,7 +101,7 @@ export default function PdfPreviewScreen() {
     } finally {
       setAddingFormat(false);
     }
-  }, [doc, id, reExportPdf, reExportImages]);
+  };
 
   // Missing-document fallback
   if (!doc) {
@@ -132,105 +132,141 @@ export default function PdfPreviewScreen() {
   }
 
   const showingPdf = !!doc.pdfUri;
+  const hasImages = !!doc.imageUris?.length;
+  const nextFormat = !doc.pdfUri
+    ? "Create PDF"
+    : !hasImages
+      ? "Save images"
+      : "Both formats ready";
 
-  return (
-    <SafeAreaView className="flex-1 bg-bg" edges={["top", "bottom"]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-
-      {/* Header: back and document name */}
-      <View className="px-5 pt-3 pb-3 border-b border-border flex-row items-center">
-        <TouchableOpacity
-          className="min-h-[44px] min-w-[44px] justify-center mr-3"
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Text className="text-accent text-base font-semibold">← Back</Text>
-        </TouchableOpacity>
-        <Text
-          className="flex-1 text-primary text-lg font-semibold tracking-tight"
-          numberOfLines={1}
-        >
-          {doc.name}
-        </Text>
-      </View>
-
-      {/* Body: react-native-pdf filling available space with page indicator */}
-      {showingPdf ? (
-        pdfError ? (
+  const renderPreview = () => {
+    if (doc.pdfUri) {
+      if (pdfError) {
+        return (
           <View className="flex-1 items-center justify-center px-6">
-            <Text className="text-secondary text-sm text-center mb-3">
+            <View className="w-14 h-14 rounded-2xl bg-surface border border-border items-center justify-center mb-4">
+              <Text className="text-destructive text-xl">!</Text>
+            </View>
+            <Text className="text-primary text-base font-semibold mb-2">
+              Preview unavailable
+            </Text>
+            <Text className="text-secondary text-sm text-center mb-4">
               {pdfError}
             </Text>
             <TouchableOpacity
-              className="bg-surface border border-border px-4 py-2 rounded-lg min-h-[44px] items-center justify-center"
+              className="bg-surface border border-border px-5 py-3 rounded-xl min-h-[44px] items-center justify-center"
               onPress={() => setPdfError(null)}
               accessibilityRole="button"
               accessibilityLabel="Retry loading PDF"
             >
-              <Text className="text-primary text-sm font-medium">Retry</Text>
+              <Text className="text-primary text-sm font-medium">Try again</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <View className="flex-1 relative bg-bg">
-            <Pdf
-              source={{ uri: doc.pdfUri! }}
-              style={{ flex: 1, backgroundColor: colors.bg }}
-              renderActivityIndicator={() => (
-                <View className="flex-1 items-center justify-center bg-bg">
-                  <ActivityIndicator color={colors.accent} size="small" />
-                </View>
-              )}
-              onPageChanged={(page, numberOfPages) => {
-                setCurrentPage(page);
-                setTotalPages(numberOfPages);
-              }}
-              onError={(error) => setPdfError(error.message)}
-            />
-            {/* Page indicator */}
-            <View className="absolute bottom-4 self-center bg-bg/85 border border-border px-3 py-1 rounded-full">
-              <Text className="text-secondary text-xs font-medium">
-                {currentPage} / {totalPages}
-              </Text>
-            </View>
+        );
+      }
+
+      return (
+        <View className="flex-1 relative bg-bg">
+          <Pdf
+            source={{ uri: doc.pdfUri }}
+            style={{ flex: 1, backgroundColor: colors.bg }}
+            renderActivityIndicator={() => (
+              <View className="flex-1 items-center justify-center bg-bg">
+                <ActivityIndicator color={colors.accent} size="small" />
+              </View>
+            )}
+            onPageChanged={(page, numberOfPages) => {
+              setCurrentPage(page);
+              setTotalPages(numberOfPages);
+            }}
+            onError={(error) => setPdfError(error.message)}
+          />
+          <View className="absolute bottom-4 self-center bg-bg/90 border border-border px-3.5 py-2 rounded-full">
+            <Text className="text-primary text-xs font-semibold">
+              PAGE {String(currentPage).padStart(2, "0")} /{" "}
+              {String(totalPages).padStart(2, "0")}
+            </Text>
           </View>
-        )
-      ) : doc.imageUris && doc.imageUris.length > 0 ? (
+        </View>
+      );
+    }
+
+    if (hasImages) {
+      return (
         <FlatList
           data={doc.imageUris}
           keyExtractor={(_, index) => String(index)}
           contentContainerClassName="p-5 gap-4"
           renderItem={({ item, index }) => (
-            <View className="bg-surface rounded-xl border border-border overflow-hidden">
+            <View className="bg-surface rounded-2xl border border-border overflow-hidden">
               <Image
                 source={{ uri: item }}
-                className="w-full h-96 bg-surface-alt"
+                className="w-full h-80 bg-surface-alt"
                 resizeMode="contain"
               />
-              <View className="p-2.5 bg-surface border-t border-border items-center">
-                <Text className="text-secondary text-xs font-medium">
-                  Page {index + 1} of {doc.imageUris?.length}
+              <View className="px-4 py-3 bg-surface border-t border-border flex-row items-center justify-between">
+                <Text className="text-secondary text-xs font-semibold tracking-[1px]">
+                  PAGE {String(index + 1).padStart(2, "0")}
+                </Text>
+                <Text className="text-muted text-xs">
+                  {index + 1} of {doc.imageUris?.length}
                 </Text>
               </View>
             </View>
           )}
         />
-      ) : (
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-muted text-sm text-center">
-            No preview available.
+      );
+    }
+
+    return (
+      <View className="flex-1 items-center justify-center px-6">
+        <Text className="text-muted text-sm text-center">
+          No preview available.
+        </Text>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-bg" edges={["top", "bottom"]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+
+      <View className="px-5 pt-3 pb-4 border-b border-border flex-row items-center">
+        <TouchableOpacity
+          className="flex-row items-center min-h-[44px] px-3 rounded-full bg-surface border border-border mr-3"
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Text className="text-accent text-sm font-semibold">←</Text>
+          <Text className="text-primary text-sm font-medium ml-2">Back</Text>
+        </TouchableOpacity>
+        <View className="flex-1">
+          <Text
+            className="text-primary text-lg font-semibold tracking-tight"
+            numberOfLines={1}
+          >
+            {doc.name}
+          </Text>
+          <Text className="text-muted text-xs mt-0.5">
+            {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"} ·{" "}
+            {showingPdf ? "PDF" : "Images"}
           </Text>
         </View>
-      )}
+      </View>
 
-      {/* Footer: primary "Share PDF", secondary "Add another format" */}
-      <View className="px-5 pt-3 pb-4 border-t border-border bg-bg gap-2.5">
+      {renderPreview()}
+
+      <View className="px-5 pt-4 pb-4 border-t border-border bg-bg gap-3">
+        <Text className="text-muted text-[11px] font-semibold tracking-[1.5px]">
+          EXPORT OPTIONS
+        </Text>
         <TouchableOpacity
-          className={`h-12 rounded-xl bg-accent items-center justify-center ${
-            sharing ? "opacity-60" : ""
+          className={`h-14 rounded-2xl bg-accent items-center justify-center ${
+            sharing || !doc.pdfUri ? "opacity-50" : ""
           }`}
           onPress={handleSharePdf}
-          disabled={sharing}
+          disabled={sharing || !doc.pdfUri}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Share PDF"
@@ -243,16 +279,18 @@ export default function PdfPreviewScreen() {
               </Text>
             </View>
           ) : (
-            <Text className="text-white text-sm font-semibold">Share PDF</Text>
+            <Text className="text-white text-sm font-semibold">
+              {doc.pdfUri ? "Share PDF" : "PDF not ready"}
+            </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          className={`h-12 rounded-xl bg-surface border border-border items-center justify-center ${
-            addingFormat ? "opacity-60" : ""
+          className={`h-14 rounded-2xl bg-surface border border-border items-center justify-center ${
+            addingFormat || (doc.pdfUri && hasImages) ? "opacity-50" : ""
           }`}
           onPress={handleAddAnotherFormat}
-          disabled={addingFormat}
+          disabled={addingFormat || (!!doc.pdfUri && hasImages)}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Add another format"
@@ -266,7 +304,7 @@ export default function PdfPreviewScreen() {
             </View>
           ) : (
             <Text className="text-primary text-sm font-semibold">
-              Add another format
+              {nextFormat}
             </Text>
           )}
         </TouchableOpacity>

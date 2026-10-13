@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -46,50 +46,43 @@ export default function ReviewScreen() {
   });
   const [savingMode, setSavingMode] = useState<"pdf" | "images" | null>(null);
 
-  const removePage = useCallback((index: number) => {
-    setPages((prev) => {
-      if (prev.length <= 1) {
-        Alert.alert("Cannot remove", "At least one page is required.");
-        return prev;
-      }
-      return prev.filter((_, i) => i !== index);
-    });
-  }, []);
+  const removePage = (index: number) => {
+    setPages((prev) =>
+      prev.length > 1 ? prev.filter((_, i) => i !== index) : prev,
+    );
+  };
 
-  const handleSave = useCallback(
-    async (mode: "pdf" | "images") => {
-      const name = docName.trim();
-      if (!name) {
-        Alert.alert("Name required", "Please enter a name for this document.");
-        return;
-      }
-      if (pages.length === 0) {
-        Alert.alert("No pages", "This document has no scanned pages.");
-        return;
-      }
+  const handleSave = async (mode: "pdf" | "images") => {
+    const name = docName.trim();
+    if (!name) {
+      Alert.alert("Name required", "Please enter a name for this document.");
+      return;
+    }
+    if (pages.length === 0) {
+      Alert.alert("No pages", "This document has no scanned pages.");
+      return;
+    }
 
-      setSavingMode(mode);
-      try {
-        const doc = await createDocument({
-          name,
-          imageUris: pages,
-          exportMode: mode,
-        });
-        navigation.navigate("PdfPreview", { id: doc.id });
-      } catch (e) {
-        Alert.alert(
-          "Save failed",
-          e instanceof Error
-            ? e.message
-            : "Something went wrong while saving the scan. Please try again.",
-        );
-        console.error("Save error:", e);
-      } finally {
-        setSavingMode(null);
-      }
-    },
-    [pages, docName, createDocument, navigation],
-  );
+    setSavingMode(mode);
+    try {
+      const doc = await createDocument({
+        name,
+        imageUris: pages,
+        exportMode: mode,
+      });
+      navigation.navigate("PdfPreview", { id: doc.id });
+    } catch (e) {
+      Alert.alert(
+        "Save failed",
+        e instanceof Error
+          ? e.message
+          : "Something went wrong while saving the scan. Please try again.",
+      );
+      console.error("Save error:", e);
+    } finally {
+      setSavingMode(null);
+    }
+  };
 
   if (pages.length === 0) {
     return (
@@ -124,30 +117,37 @@ export default function ReviewScreen() {
       >
         <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
 
-        {/* Header: back, editable document name, page count */}
-        <View className="px-5 pt-3 pb-3 border-b border-border">
-          <View className="flex-row items-center justify-between mb-2">
+        <View className="px-5 pt-3 pb-5 border-b border-border gap-4">
+          <View className="flex-row items-center justify-between">
             <TouchableOpacity
-              className="min-h-[44px] min-w-[44px] justify-center"
+              className="flex-row items-center min-h-[44px] px-3 rounded-full bg-surface border border-border"
               onPress={() => navigation.goBack()}
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Text className="text-accent text-base font-semibold">← Back</Text>
+              <Text className="text-accent text-sm font-semibold">←</Text>
+              <Text className="text-primary text-sm font-medium ml-2">Back</Text>
             </TouchableOpacity>
-            <Text className="text-secondary text-xs font-medium">
-              {pages.length} {pages.length === 1 ? "page" : "pages"}
-            </Text>
+            <View className="bg-surface border border-border rounded-full px-3 py-2">
+              <Text className="text-secondary text-xs font-semibold">
+                {String(pages.length).padStart(2, "0")} {pages.length === 1 ? "PAGE" : "PAGES"}
+              </Text>
+            </View>
           </View>
-          <TextInput
-            className="bg-surface text-primary border border-border rounded-lg px-3.5 py-2.5 text-sm font-medium"
-            value={docName}
-            onChangeText={setDocName}
-            placeholder="Document name"
-            maxLength={60}
-            selectionColor={colors.accent}
-            accessibilityLabel="Document name"
-          />
+          <View>
+            <Text className="text-muted text-[11px] font-semibold tracking-[1.5px] mb-2">
+              DOCUMENT NAME
+            </Text>
+            <TextInput
+              className="bg-surface text-primary border border-border rounded-xl px-4 py-3.5 text-base font-medium"
+              value={docName}
+              onChangeText={setDocName}
+              placeholder="Document name"
+              maxLength={60}
+              selectionColor={colors.accent}
+              accessibilityLabel="Document name"
+            />
+          </View>
         </View>
 
         {/* 10 page limit warning */}
@@ -166,40 +166,39 @@ export default function ReviewScreen() {
           data={pages}
           keyExtractor={(_, i) => i.toString()}
           renderItem={({ item, index }) => (
-            <View className="bg-surface rounded-xl border border-border overflow-hidden">
-              <View className="h-96 bg-surface-alt relative items-center justify-center">
+            <View className="bg-surface rounded-2xl border border-border overflow-hidden">
+              <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
+                <Text className="text-secondary text-xs font-semibold tracking-[1px]">
+                  PAGE {String(index + 1).padStart(2, "0")}
+                </Text>
+                <TouchableOpacity
+                  className={`min-h-[36px] px-3 rounded-full border border-border flex-row items-center ${pages.length === 1 ? "opacity-40" : "bg-surface-alt"}`}
+                  onPress={() => removePage(index)}
+                  disabled={pages.length === 1}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: pages.length === 1 }}
+                  accessibilityLabel={`Remove page ${index + 1}`}
+                >
+                  <Text className="text-destructive text-xs font-semibold">Remove</Text>
+                </TouchableOpacity>
+              </View>
+              <View className="h-80 bg-surface-alt relative items-center justify-center">
                 <Image
                   source={{ uri: item }}
                   className="w-full h-full"
                   resizeMode="contain"
                 />
-                {/* Page indicator */}
-                <View className="absolute bottom-3 left-3 bg-bg/80 px-2.5 py-1 rounded-full">
-                  <Text className="text-primary text-xs font-medium">
-                    Page {index + 1} of {pages.length}
-                  </Text>
-                </View>
-                {/* Per-page remove button (44x44 touch target) */}
-                <TouchableOpacity
-                  className="absolute top-2 right-2 w-11 h-11 items-center justify-center"
-                  onPress={() => removePage(index)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove page ${index + 1}`}
-                  hitSlop={{ top: 4, right: 4, bottom: 4, left: 4 }}
-                >
-                  <View className="w-7 h-7 rounded-full bg-bg/80 items-center justify-center">
-                    <Text className="text-destructive text-sm font-bold">✕</Text>
-                  </View>
-                </TouchableOpacity>
               </View>
             </View>
           )}
         />
 
-        {/* Footer: pinned above safe-area inset, primary "Export as PDF", secondary "Save as Images" */}
-        <View className="px-5 pt-3 pb-4 border-t border-border bg-bg gap-2.5">
+        <View className="px-5 pt-4 pb-4 border-t border-border bg-bg gap-3">
+          <Text className="text-muted text-[11px] font-semibold tracking-[1.5px]">
+            SAVE YOUR SCAN AS
+          </Text>
           <TouchableOpacity
-            className={`h-12 rounded-xl bg-accent items-center justify-center ${
+            className={`h-14 rounded-2xl bg-accent items-center justify-center ${
               exporting ? "opacity-60" : ""
             }`}
             onPress={() => handleSave("pdf")}
@@ -223,7 +222,7 @@ export default function ReviewScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            className={`h-12 rounded-xl bg-surface border border-border items-center justify-center ${
+            className={`h-14 rounded-2xl bg-surface border border-border items-center justify-center ${
               exporting ? "opacity-60" : ""
             }`}
             onPress={() => handleSave("images")}
