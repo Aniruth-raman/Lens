@@ -34,7 +34,8 @@
         {
           "cameraPermission": "Lens needs camera access to scan documents."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

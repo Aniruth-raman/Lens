@@ -8,20 +8,22 @@ A React Native document scanner app built with Expo. Scan documents using your p
 - 📄 Multi-page scan support (up to 10 pages per session)
 - 🗂️ Gallery to browse all scanned documents
 - 📑 PDF export via `expo-print`
+- 🖼️ Save scanned pages as images and add the other format later
 - 📤 Share PDFs via system share sheet
-- 🗑️ Delete documents (clears PDF from disk)
+- 🗑️ Delete documents (removes the Lens record and its private source/PDF files)
 
 ## Tech stack
 
-| Package | Purpose |
-|---|---|
-| `react-native-document-scanner-plugin` | Camera + edge detection + perspective correction |
-| `expo-print` | Generate PDF from scanned images |
-| `expo-sharing` | Share PDF via native share sheet |
-| `expo-file-system` | Persist PDF files on device |
-| `@react-native-async-storage/async-storage` | Store document metadata |
-| `@react-navigation/native-stack` | Screen navigation |
-| `react-native-webview` | In-app PDF preview |
+| Package                                     | Purpose                                          |
+| ------------------------------------------- | ------------------------------------------------ |
+| `react-native-document-scanner-plugin`      | Camera + edge detection + perspective correction |
+| `expo-print`                                | Generate PDF from scanned images                 |
+| `expo-sharing`                              | Share PDF via native share sheet                 |
+| `expo-file-system`                          | Persist PDF files on device                      |
+| `@react-native-async-storage/async-storage` | Store document metadata                          |
+| `@react-navigation/native-stack`            | Screen navigation                                |
+| `react-native-pdf`                          | In-app PDF preview                               |
+| `zustand`                                   | Shared document index and loading/export state   |
 
 ## Project structure
 
@@ -33,11 +35,11 @@ src/
     PdfPreviewScreen.tsx # View PDF in-app, share button
   components/
     DocumentCard.tsx     # Thumbnail card used in gallery grid
-  hooks/
-    useScannedDocs.ts    # Load/save/delete doc metadata (AsyncStorage + FileSystem)
-    usePdfExport.ts      # Build HTML → PDF, move to docs dir, share
-  utils/
-    theme.ts             # Color tokens, spacing, border radius
+  store/
+    documentsStore.ts   # Load, create, rename, delete, and export documents
+  services/
+    documentExportService.ts # Persist source pages and generate PDF/image exports
+    documentHtml.ts     # Build printable PDF HTML
   types/
     index.ts             # ScannedDoc type, navigation param list
 App.tsx                  # Navigation container + stack setup
@@ -48,8 +50,8 @@ app.json                 # Expo config with plugin + permissions
 
 ### 1. Prerequisites
 
-- Node 18+
-- Expo CLI: `npm install -g eas-cli`
+- Node.js 20.19.x or newer
+- EAS CLI: `npm install -g eas-cli` (for cloud builds)
 - EAS account: `eas login`
 
 ### 2. Install
@@ -58,26 +60,7 @@ app.json                 # Expo config with plugin + permissions
 npm install
 ```
 
-### 3. Configure EAS
-
-```bash
-eas build:configure
-```
-
-This creates `eas.json`. Make sure it has a `development` profile:
-
-```json
-{
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    }
-  }
-}
-```
-
-### 4. Build dev client
+### 3. Build the development client
 
 > ⚠️ `react-native-document-scanner-plugin` requires a development build — it will NOT work in Expo Go.
 
@@ -91,7 +74,7 @@ eas build --profile development --platform ios
 
 Install the resulting `.apk` / `.ipa` on your device.
 
-### 5. Start dev server
+### 4. Start the dev server
 
 ```bash
 npx expo start --dev-client
@@ -106,23 +89,17 @@ GalleryScreen
   └─ [+ FAB] → DocumentScanner.scanDocument()
                   └─ returns corrected image URIs
                        └─ ReviewScreen
-                            └─ [Export as PDF] → PDF file on disk
+                            └─ [Export as PDF / Save as Images]
                                  └─ PdfPreviewScreen
-                                      └─ [Share] or [Done → Gallery]
+                                      └─ [Create missing format / Share PDF]
+                                           └─ Gallery
 ```
 
-## Android permission note
+Scanned pages and PDFs are kept in app-private document storage so they remain
+available for previews and later format exports. On Android, exports are also
+copied to Downloads/Lens or Pictures/Lens. Deleting a Lens document removes its
+private files; copies already exported to shared Android storage remain there.
 
-You don't need to request camera permissions manually unless another plugin in your project adds `<uses-permission android:name="android.permission.CAMERA" />` to `AndroidManifest.xml`. If you get a "Permission Denial" error opening the camera, add this before your export call:
+## PDF preview
 
-```tsx
-import { Platform, PermissionsAndroid } from 'react-native';
-
-if (Platform.OS === 'android') {
-  await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-}
-```
-
-## iOS PDF preview note
-
-On iOS, `react-native-webview` renders local `file://` PDFs directly. On Android, the WebView falls back to Google Docs viewer, which requires an internet connection. For a fully offline Android PDF viewer, consider `react-native-pdf` as an alternative.
+`react-native-pdf` previews the app-private PDF locally on iOS and Android.

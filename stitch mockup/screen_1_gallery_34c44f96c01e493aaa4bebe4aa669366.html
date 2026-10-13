@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Lens - Document Gallery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            surface: '#111317',
+            surfaceContainerLow: '#17191E',
+            surfaceContainer: '#1E2128',
+            surfaceContainerHigh: '#272B33',
+            surfaceContainerHighest: '#31353E',
+            outlineVariant: '#2A2E37',
+            primary: '#8183FF',
+            primaryHover: '#6E70FF',
+            onSurface: '#E2E2E6',
+            onSurfaceVariant: '#9EA1AA',
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      background-color: #111317;
+      color: #E2E2E6;
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .aspect-a4 {
+      aspect-ratio: 1 / 1.38;
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .material-symbols-fill {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-onSurface antialiased min-h-full flex flex-col justify-start">
+<!-- Full Mobile App Container -->
+<main class="w-full max-w-[430px] mx-auto min-h-screen flex flex-col relative bg-surface">
+<!-- iOS / Mobile Status Bar -->
+<header class="pt-2 px-5 pb-1 flex items-center justify-between text-xs text-onSurfaceVariant select-none z-10">
+<span class="font-semibold text-[14px] text-white tracking-tight">9:41</span>
+<div class="flex items-center space-x-1.5">
+<!-- Signal -->
+<span class="material-symbols-outlined text-[15px] text-white">signal_cellular_alt</span>
+<!-- Wifi -->
+<span class="material-symbols-outlined text-[15px] text-white">wifi</span>
+<!-- Battery Pill -->
+<div class="w-5 h-2.5 border border-white/60 rounded-xs p-0.5 flex items-center ml-0.5">
+<div class="h-full w-3 bg-white rounded-2xs"></div>
+</div>
+</div>
+</header>
+<!-- Google-style Top App Bar -->
+<section class="px-4 pt-2.5 pb-2 flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">document_scanner</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight text-white">Lens</h1>
+</div>
+<!-- Counter Badge / Search Icon -->
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-0.5 text-[11px] font-medium tracking-wide rounded-full bg-surfaceContainerHighest text-onSurfaceVariant border border-outlineVariant/70" id="doc-counter-badge">
+          8 docs
+        </span>
+<button aria-label="Search" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surfaceContainer text-onSurfaceVariant active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[19px]">search</span>
+</button>
+</div>
+</section>
+<!-- State Switcher Pills (Google Material 3 Segmented Filter) -->
+<nav aria-label="View switcher" class="px-4 py-2">
+<div class="bg-surfaceContainerLow p-1 rounded-xl flex items-center space-x-1 border border-outlineVariant/60 text-xs">
+<button class="flex-1 py-1.5 px-3 rounded-lg font-medium text-center bg-surfaceContainerHighest text-white shadow-xs transition-all flex items-center justify-center space-x-1" id="btn-active" onclick="showState('active')">
+<span>Documents</span>
+<span class="text-[10px] bg-white/10 px-1.5 py-0.2 rounded-full" id="tab-count">8</span>
+</button>
+<button class="flex-1 py-1.5 px-3 rounded-lg font-medium text-center text-onSurfaceVariant hover:text-white transition-all" id="btn-empty" onclick="showState('empty')">
+          Empty
+        </button>
+<button class="flex-1 py-1.5 px-3 rounded-lg font-medium text-center text-onSurfaceVariant hover:text-white transition-all" id="btn-skeleton" onclick="showState('skeleton')">
+          Skeleton
+        </button>
+</div>
+</nav>
+<!-- SCROLLABLE CONTENT AREA -->
+<div class="flex-1 px-4 pt-2 pb-24 overflow-y-auto">
+<!-- 1. ACTIVE POPULATED STATE (2-Column Document Grid) -->
+<div class="grid grid-cols-2 gap-3 pb-8" id="state-active">
+<!-- Card 1 -->
+<article class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col active:scale-[0.98] transition duration-150 cursor-pointer shadow-sm group">
+<div class="w-full aspect-a4 bg-[#0F1115] rounded-xl overflow-hidden relative border border-outlineVariant/80 p-2.5 flex flex-col">
+<!-- Simulated Document Paper Sheet -->
+<div class="w-full h-full bg-[#FAFAFA] rounded-md p-2 flex flex-col justify-between text-neutral-900 shadow-inner">
+<div class="space-y-1">
+<div class="h-1.5 w-10 bg-neutral-900 rounded-full"></div>
+<div class="h-1 w-16 bg-neutral-400 rounded-full mt-1.5"></div>
+<div class="h-1 w-20 bg-neutral-300 rounded-full"></div>
+<div class="h-1 w-14 bg-neutral-300 rounded-full"></div>
+<div class="h-1 w-12 bg-neutral-200 rounded-full"></div>
+</div>
+<div class="border-t border-neutral-200 pt-1 flex justify-between items-center text-[7px] font-mono text-neutral-500">
+<span class="font-bold">INVOICE</span>
+<span>$1,420.00</span>
+</div>
+</div>
+<!-- Page Tag Badge -->
+<div class="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-[10px] font-medium text-gray-200 px-1.5 py-0.5 rounded-md border border-white/10">
+              3 p
+            </div>
+</div>
+<div class="pt-2 px-0.5">
+<h2 class="text-xs font-semibold text-white truncate leading-tight group-hover:text-primary transition-colors">Tax Return 2025 Form 1040</h2>
+<p class="text-[11px] text-onSurfaceVariant mt-0.5">3 pages · Oct 14</p>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col active:scale-[0.98] transition duration-150 cursor-pointer shadow-sm group">
+<div class="w-full aspect-a4 bg-[#0F1115] rounded-xl overflow-hidden relative border border-outlineVariant/80 p-2.5 flex flex-col">
+<div class="w-full h-full bg-[#F3F4F6] rounded-md p-2 flex flex-col justify-between text-neutral-900 shadow-inner">
+<div>
+<div class="flex items-center space-x-1 mb-1.5">
+<div class="w-2.5 h-2.5 rounded-full border border-neutral-600"></div>
+<div class="h-1.5 w-11 bg-neutral-800 rounded-full"></div>
+</div>
+<div class="space-y-1">
+<div class="h-1 w-full bg-neutral-400 rounded-full"></div>
+<div class="h-1 w-5/6 bg-neutral-300 rounded-full"></div>
+<div class="h-1 w-4/6 bg-neutral-300 rounded-full"></div>
+</div>
+</div>
+<div class="h-3 w-8 border border-neutral-400 rounded self-end flex items-center justify-center text-[6px] font-bold text-neutral-500">
+                SIGN
+              </div>
+</div>
+<div class="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-[10px] font-medium text-gray-200 px-1.5 py-0.5 rounded-md border border-white/10">
+              1 p
+            </div>
+</div>
+<div class="pt-2 px-0.5">
+<h2 class="text-xs font-semibold text-white truncate leading-tight group-hover:text-primary transition-colors">Apartment Lease Agreement</h2>
+<p class="text-[11px] text-onSurfaceVariant mt-0.5">1 page · Oct 13</p>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col active:scale-[0.98] transition duration-150 cursor-pointer shadow-sm group">
+<div class="w-full aspect-a4 bg-[#0F1115] rounded-xl overflow-hidden relative border border-outlineVariant/80 p-2.5 flex flex-col">
+<div class="w-full h-full bg-[#FFFFFF] rounded-md p-2 flex flex-col justify-between text-neutral-900 shadow-inner">
+<div class="space-y-1">
+<div class="h-1.5 w-14 bg-neutral-900 rounded-full"></div>
+<div class="h-1 w-full bg-neutral-300 rounded-full mt-1"></div>
+<div class="h-1 w-11/12 bg-neutral-300 rounded-full"></div>
+<div class="h-1 w-4/5 bg-neutral-300 rounded-full"></div>
+<div class="h-1 w-full bg-neutral-200 rounded-full"></div>
+</div>
+<div class="text-[6px] font-medium text-neutral-400 tracking-wider">PAGE 1 OF 5</div>
+</div>
+<div class="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-[10px] font-medium text-gray-200 px-1.5 py-0.5 rounded-md border border-white/10">
+              5 p
+            </div>
+</div>
+<div class="pt-2 px-0.5">
+<h2 class="text-xs font-semibold text-white truncate leading-tight group-hover:text-primary transition-colors">Consulting Contract Terms</h2>
+<p class="text-[11px] text-onSurfaceVariant mt-0.5">5 pages · Oct 12</p>
+</div>
+</article>
+<!-- Card 4 -->
+<article class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col active:scale-[0.98] transition duration-150 cursor-pointer shadow-sm group">
+<div class="w-full aspect-a4 bg-[#0F1115] rounded-xl overflow-hidden relative border border-outlineVariant/80 p-2.5 flex flex-col">
+<div class="w-full h-full bg-[#FAF9F6] rounded-md p-2 flex flex-col justify-start space-y-1 text-neutral-900 shadow-inner">
+<div class="h-1.5 w-9 bg-neutral-800 rounded-full mb-0.5"></div>
+<div class="h-[1px] w-full bg-neutral-200 my-0.5"></div>
+<div class="flex justify-between items-center text-[6px] text-neutral-600">
+<span>Coffee Beans</span>
+<span>$18.50</span>
+</div>
+<div class="flex justify-between items-center text-[6px] text-neutral-600">
+<span>Filters</span>
+<span>$6.00</span>
+</div>
+<div class="h-[1px] w-full bg-neutral-200 my-0.5"></div>
+<div class="flex justify-between items-center text-[7px] font-bold text-neutral-800">
+<span>TOTAL</span>
+<span>$24.50</span>
+</div>
+</div>
+<div class="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-[10px] font-medium text-gray-200 px-1.5 py-0.5 rounded-md border border-white/10">
+              1 p
+            </div>
+</div>
+<div class="pt-2 px-0.5">
+<h2 class="text-xs font-semibold text-white truncate leading-tight group-hover:text-primary transition-colors">Blue Bottle Receipt</h2>
+<p class="text-[11px] text-onSurfaceVariant mt-0.5">1 page · Oct 11</p>
+</div>
+</article>
+<!-- Card 5 -->
+<article class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col active:scale-[0.98] transition duration-150 cursor-pointer shadow-sm group">
+<div class="w-full aspect-a4 bg-[#0F1115] rounded-xl overflow-hidden relative border border-outlineVariant/80 p-2.5 flex flex-col">
+<div class="w-full h-full bg-[#FFFFFF] rounded-md p-2 flex flex-col justify-between text-neutral-900 shadow-inner">
+<div class="space-y-1">
+<div class="h-1.5 w-14 bg-neutral-900 rounded-full"></div>
+<div class="h-1 w-full bg-neutral-300 rounded-full mt-1"></div>
+<div class="h-1 w-4/5 bg-neutral-300 rounded-full"></div>
+</div>
+<div class="w-8 h-8 rounded border border-neutral-300 self-center flex items-center justify-center text-[6px] text-neutral-400 font-bold">
+                PASSPORT
+              </div>
+<div class="text-[6px] text-neutral-400 font-mono tracking-widest truncate">P&lt;USAJOHN&lt;&lt;DOE</div>
+</div>
+<div class="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-[10px] font-medium text-gray-200 px-1.5 py-0.5 rounded-md border border-white/10">
+              2 p
+            </div>
+</div>
+<div class="pt-2 px-0.5">
+<h2 class="text-xs font-semibold text-white truncate leading-tight group-hover:text-primary transition-colors">Passport Scan Copies</h2>
+<p class="text-[11px] text-onSurfaceVariant mt-0.5">2 pages · Oct 08</p>
+</div>
+</article>
+<!-- Card 6 -->
+<article class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col active:scale-[0.98] transition duration-150 cursor-pointer shadow-sm group">
+<div class="w-full aspect-a4 bg-[#0F1115] rounded-xl overflow-hidden relative border border-outlineVariant/80 p-2.5 flex flex-col">
+<div class="w-full h-full bg-[#F4F4F5] rounded-md p-2 flex flex-col justify-between text-neutral-900 shadow-inner">
+<div class="space-y-1">
+<div class="h-1.5 w-11 bg-neutral-800 rounded-full"></div>
+<div class="h-1 w-full bg-neutral-300 rounded-full"></div>
+<div class="h-1 w-3/4 bg-neutral-300 rounded-full"></div>
+</div>
+<div class="h-1.5 w-10 bg-neutral-400 rounded-full self-start"></div>
+</div>
+<div class="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-[10px] font-medium text-gray-200 px-1.5 py-0.5 rounded-md border border-white/10">
+              4 p
+            </div>
+</div>
+<div class="pt-2 px-0.5">
+<h2 class="text-xs font-semibold text-white truncate leading-tight group-hover:text-primary transition-colors">Health Insurance Policy</h2>
+<p class="text-[11px] text-onSurfaceVariant mt-0.5">4 pages · Sep 29</p>
+</div>
+</article>
+</div>
+<!-- 2. EMPTY STATE -->
+<section class="hidden flex-col items-center justify-center pt-20 pb-16 text-center px-4" id="state-empty">
+<div class="w-16 h-16 rounded-3xl bg-surfaceContainer border border-outlineVariant flex items-center justify-center mb-4 text-primary shadow-sm">
+<span class="material-symbols-outlined text-[32px]">folder_open</span>
+</div>
+<h2 class="text-base font-semibold text-white tracking-tight">No documents yet</h2>
+<p class="text-xs text-onSurfaceVariant mt-1.5 max-w-[220px] leading-relaxed">
+          Tap the scan button below to digitize your first receipt, contract, or ID card.
+        </p>
+<!-- Google subtle helper indicator -->
+<div class="mt-8 inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-surfaceContainer border border-outlineVariant/60 text-onSurfaceVariant text-[11px]">
+<span>Tap</span>
+<span class="material-symbols-outlined text-[13px] text-primary">add</span>
+<span>to scan your first doc</span>
+</div>
+</section>
+<!-- 3. SKELETON STATE -->
+<div class="hidden grid grid-cols-2 gap-3 pb-8" id="state-skeleton">
+<!-- Skeleton Card 1 -->
+<div class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col animate-pulse">
+<div class="w-full aspect-a4 bg-surfaceContainer rounded-xl border border-outlineVariant/50 flex flex-col p-3 justify-between">
+<div class="space-y-2">
+<div class="h-2 w-12 bg-white/10 rounded-full"></div>
+<div class="h-1.5 w-24 bg-white/5 rounded-full"></div>
+<div class="h-1.5 w-20 bg-white/5 rounded-full"></div>
+</div>
+<div class="h-1.5 w-10 bg-white/10 rounded-full"></div>
+</div>
+<div class="pt-2 px-1 space-y-1.5">
+<div class="h-2.5 w-24 bg-white/15 rounded-full"></div>
+<div class="h-2 w-16 bg-white/5 rounded-full"></div>
+</div>
+</div>
+<!-- Skeleton Card 2 -->
+<div class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col animate-pulse">
+<div class="w-full aspect-a4 bg-surfaceContainer rounded-xl border border-outlineVariant/50 flex flex-col p-3 justify-between">
+<div class="space-y-2">
+<div class="h-2 w-16 bg-white/10 rounded-full"></div>
+<div class="h-1.5 w-28 bg-white/5 rounded-full"></div>
+<div class="h-1.5 w-14 bg-white/5 rounded-full"></div>
+</div>
+<div class="h-1.5 w-8 bg-white/10 rounded-full"></div>
+</div>
+<div class="pt-2 px-1 space-y-1.5">
+<div class="h-2.5 w-28 bg-white/15 rounded-full"></div>
+<div class="h-2 w-14 bg-white/5 rounded-full"></div>
+</div>
+</div>
+<!-- Skeleton Card 3 -->
+<div class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col animate-pulse">
+<div class="w-full aspect-a4 bg-surfaceContainer rounded-xl border border-outlineVariant/50 flex flex-col p-3 justify-between">
+<div class="space-y-2">
+<div class="h-2 w-10 bg-white/10 rounded-full"></div>
+<div class="h-1.5 w-20 bg-white/5 rounded-full"></div>
+</div>
+<div class="h-1.5 w-12 bg-white/10 rounded-full"></div>
+</div>
+<div class="pt-2 px-1 space-y-1.5">
+<div class="h-2.5 w-20 bg-white/15 rounded-full"></div>
+<div class="h-2 w-14 bg-white/5 rounded-full"></div>
+</div>
+</div>
+<!-- Skeleton Card 4 -->
+<div class="bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col animate-pulse">
+<div class="w-full aspect-a4 bg-surfaceContainer rounded-xl border border-outlineVariant/50 flex flex-col p-3 justify-between">
+<div class="space-y-2">
+<div class="h-2 w-14 bg-white/10 rounded-full"></div>
+<div class="h-1.5 w-24 bg-white/5 rounded-full"></div>
+</div>
+<div class="h-1.5 w-10 bg-white/10 rounded-full"></div>
+</div>
+<div class="pt-2 px-1 space-y-1.5">
+<div class="h-2.5 w-22 bg-white/15 rounded-full"></div>
+<div class="h-2 w-12 bg-white/5 rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- MATERIAL 3 / GOOGLE FLOATING ACTION BUTTON (FAB) -->
+<div class="fixed bottom-6 right-5 sm:right-[max(1.25rem,calc((100vw-430px)/2+1.25rem))] z-30">
+<button aria-label="Scan document" class="w-14 h-14 rounded-2xl bg-primary hover:bg-primaryHover text-surfaceContainerLowest flex items-center justify-center shadow-lg shadow-primary/25 active:scale-95 transition-all focus:outline-none">
+<span class="material-symbols-outlined text-[26px] text-white">camera</span>
+</button>
+</div>
+<!-- Home Indicator Bar (iOS style) -->
+<footer class="w-full py-1.5 flex justify-center pb-2 bg-surface select-none">
+<div class="w-32 h-1 bg-white/20 rounded-full"></div>
+</footer>
+</main>
+<script>
+    function showState(type) {
+      const activeEl = document.getElementById('state-active');
+      const emptyEl = document.getElementById('state-empty');
+      const skeletonEl = document.getElementById('state-skeleton');
+
+      const btnActive = document.getElementById('btn-active');
+      const btnEmpty = document.getElementById('btn-empty');
+      const btnSkeleton = document.getElementById('btn-skeleton');
+
+      const docBadge = document.getElementById('doc-counter-badge');
+
+      // Reset states
+      activeEl.classList.add('hidden');
+      emptyEl.classList.add('hidden');
+      skeletonEl.classList.add('hidden');
+
+      const inactiveBtnClass = "flex-1 py-1.5 px-3 rounded-lg font-medium text-center text-onSurfaceVariant hover:text-white transition-all flex items-center justify-center space-x-1";
+      const activeBtnClass = "flex-1 py-1.5 px-3 rounded-lg font-medium text-center bg-surfaceContainerHighest text-white shadow-xs transition-all flex items-center justify-center space-x-1";
+
+      btnActive.className = inactiveBtnClass;
+      btnEmpty.className = "flex-1 py-1.5 px-3 rounded-lg font-medium text-center text-onSurfaceVariant hover:text-white transition-all";
+      btnSkeleton.className = "flex-1 py-1.5 px-3 rounded-lg font-medium text-center text-onSurfaceVariant hover:text-white transition-all";
+
+      if (type === 'active') {
+        activeEl.classList.remove('hidden');
+        btnActive.className = activeBtnClass;
+        docBadge.innerText = "8 docs";
+      } else if (type === 'empty') {
+        emptyEl.classList.remove('hidden');
+        emptyEl.classList.add('flex');
+        btnEmpty.className = "flex-1 py-1.5 px-3 rounded-lg font-medium text-center bg-surfaceContainerHighest text-white shadow-xs transition-all";
+        docBadge.innerText = "0 docs";
+      } else if (type === 'skeleton') {
+        skeletonEl.classList.remove('hidden');
+        btnSkeleton.className = "flex-1 py-1.5 px-3 rounded-lg font-medium text-center bg-surfaceContainerHighest text-white shadow-xs transition-all";
+        docBadge.innerText = "Loading...";
+      }
+    }
+  </script>
+</body></html>
