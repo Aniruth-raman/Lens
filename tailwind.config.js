@@ -1,15 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 const colors = {
-  bg: "#09090b",
-  surface: "#141417",
-  "surface-alt": "#1c1c20",
-  border: "#27272a",
-  "border-light": "#3f3f46",
+  bg: "#0a0a0a",
+  surface: "#151515",
+  "surface-alt": "#1e1e1e",
+  border: "#262626",
   accent: "#2563eb",
-  "accent-subtle": "rgba(37, 99, 235, 0.15)",
-  primary: "#fafafa",
-  secondary: "#a1a1aa",
-  muted: "#71717a",
+  primary: "#f5f5f5",
+  secondary: "#a3a3a3",
+  muted: "#737373",
   destructive: "#ef4444",
 };
 
@@ -24,13 +22,11 @@ module.exports = {
         md: 10,
         lg: 14,
         xl: 18,
-        "2xl": 22,
         full: 999,
       },
     },
   },
   plugins: [],
-  // Raw values for the handful of RN props that don't accept `className`
-  // (StatusBar.backgroundColor, ActivityIndicator.color, react-native-pdf's style, etc.)
+  // Raw values for RN props that do not accept className
   colors,
 };

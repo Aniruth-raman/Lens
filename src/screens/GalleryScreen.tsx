@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,12 +7,15 @@ import {
   StatusBar,
   ActivityIndicator,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import DocumentScanner from "react-native-document-scanner-plugin";
 import DocumentCard from "../components/DocumentCard";
-import { PlusIcon, DocumentIcon } from "../components/Icons";
 import { useDocumentsStore } from "../store/documentsStore";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList, ScannedDoc } from "../types";
@@ -25,10 +28,13 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, "Gallery">;
 export default function GalleryScreen() {
   const navigation = useNavigation<NavProp>();
 
-  // Shared store — same data whichever screen reads it
   const docs = useDocumentsStore((s) => s.docs);
   const loading = useDocumentsStore((s) => s.loading);
   const deleteDoc = useDocumentsStore((s) => s.deleteDoc);
+  const renameDoc = useDocumentsStore((s) => s.renameDoc);
+
+  const [docToRename, setDocToRename] = useState<ScannedDoc | null>(null);
+  const [renameText, setRenameText] = useState("");
 
   const startScan = useCallback(async () => {
     try {
@@ -58,7 +64,7 @@ export default function GalleryScreen() {
     (doc: ScannedDoc) => {
       Alert.alert(
         "Delete document?",
-        `"${doc.name}" will be removed from Lens.`,
+        `"${doc.name}" will be removed from Lens. Copies previously exported to Downloads or Pictures will remain on your device.`,
         [
           { text: "Cancel", style: "cancel" },
           {
@@ -82,9 +88,51 @@ export default function GalleryScreen() {
     [deleteDoc],
   );
 
+  const showDocOptions = useCallback(
+    (doc: ScannedDoc) => {
+      Alert.alert(doc.name, "Choose an action", [
+        {
+          text: "Rename",
+          onPress: () => {
+            setRenameText(doc.name);
+            setDocToRename(doc);
+          },
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => confirmDelete(doc),
+        },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    },
+    [confirmDelete],
+  );
+
+  const submitRename = useCallback(async () => {
+    if (!docToRename) return;
+    const trimmed = renameText.trim();
+    if (!trimmed) {
+      Alert.alert("Name required", "Please enter a valid document name.");
+      return;
+    }
+    try {
+      await renameDoc(docToRename.id, trimmed);
+      setDocToRename(null);
+    } catch (e) {
+      Alert.alert(
+        "Rename failed",
+        e instanceof Error ? e.message : "Could not rename document.",
+      );
+    }
+  }, [docToRename, renameText, renameDoc]);
+
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-bg">
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-bg"
+        edges={["top", "bottom"]}
+      >
         <ActivityIndicator color={colors.accent} size="small" />
       </SafeAreaView>
     );
@@ -94,60 +142,101 @@ export default function GalleryScreen() {
     <SafeAreaView className="flex-1 bg-bg" edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
 
-      {/* Header */}
-      <View className="px-5 pt-3 pb-3.5 border-b border-border flex-row items-center justify-between">
-        <View>
-          <Text className="text-primary text-2xl font-bold tracking-tight">
-            Lens
-          </Text>
-        </View>
-        <View className="bg-surface border border-border px-3 py-1 rounded-full">
-          <Text className="text-secondary text-xs font-medium">
-            {docs.length} {docs.length === 1 ? "document" : "documents"}
-          </Text>
-        </View>
+      {/* Header: app name "Lens" and nothing else decorative */}
+      <View className="px-5 pt-3 pb-3 border-b border-border">
+        <Text className="text-primary text-2xl font-bold tracking-tight">
+          Lens
+        </Text>
       </View>
 
-      {/* Grid */}
+      {/* Grid: two-column grid of DocumentCards, newest first */}
       <FlatList
         data={docs}
         keyExtractor={(d) => d.id}
         numColumns={2}
         className="flex-1"
-        contentContainerClassName="px-3.5 pt-3 pb-28"
+        contentContainerClassName="p-4 pb-28 gap-3"
+        columnWrapperClassName="gap-3"
         renderItem={({ item }) => (
           <DocumentCard
             doc={item}
             onPress={() => openDoc(item)}
-            onDeletePress={() => confirmDelete(item)}
+            onLongPress={() => showDocOptions(item)}
+            onMenuPress={() => showDocOptions(item)}
           />
         )}
         ListEmptyComponent={
-          <View className="flex-1 items-center justify-center pt-36 px-6">
-            <View className="w-16 h-16 rounded-2xl bg-surface border border-border items-center justify-center mb-4">
-              <DocumentIcon size={28} color="#71717a" />
-            </View>
-            <Text className="text-primary text-base font-semibold mb-1">
+          <View className="flex-1 items-center justify-center pt-48 px-6">
+            <Text className="text-primary text-base font-semibold mb-1 text-center">
               No documents yet
             </Text>
-            <Text className="text-secondary text-xs text-center max-w-[220px] leading-5">
-              Tap the button below to scan and organize your documents
+            <Text className="text-muted text-sm text-center">
+              Tap the + button to scan your first document
             </Text>
           </View>
         }
       />
 
-      {/* Floating Action Button */}
+      {/* Primary action: FAB bottom-right above safe-area inset */}
       <TouchableOpacity
-        className="absolute bottom-8 right-5 bg-accent rounded-full px-5 py-3.5 flex-row items-center gap-2 shadow-lg shadow-black/50 elevation-6 active:opacity-90"
+        className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-accent items-center justify-center shadow-lg elevation-6"
         onPress={startScan}
         activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Scan new document"
       >
-        <PlusIcon size={14} color="#ffffff" strokeWidth={2.5} />
-        <Text className="text-white text-xs font-semibold tracking-wide">
-          New Scan
-        </Text>
+        <Text className="text-white text-3xl font-light leading-none">＋</Text>
       </TouchableOpacity>
+
+      {/* Rename modal */}
+      {docToRename && (
+        <Modal
+          transparent
+          animationType="fade"
+          visible={!!docToRename}
+          onRequestClose={() => setDocToRename(null)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            className="flex-1 bg-black/70 items-center justify-center px-6"
+          >
+            <View className="w-full bg-surface border border-border rounded-xl p-5">
+              <Text className="text-primary text-base font-semibold mb-3">
+                Rename Document
+              </Text>
+              <TextInput
+                className="bg-surface-alt text-primary border border-border rounded-lg px-3.5 py-2.5 text-sm mb-4"
+                value={renameText}
+                onChangeText={setRenameText}
+                autoFocus
+                maxLength={60}
+                selectionColor={colors.accent}
+                accessibilityLabel="Document name input"
+              />
+              <View className="flex-row justify-end gap-3">
+                <TouchableOpacity
+                  className="px-4 py-2 rounded-lg bg-surface-alt min-h-[44px] items-center justify-center"
+                  onPress={() => setDocToRename(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel rename"
+                >
+                  <Text className="text-secondary text-sm font-medium">
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="px-4 py-2 rounded-lg bg-accent min-h-[44px] items-center justify-center"
+                  onPress={submitRename}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save new document name"
+                >
+                  <Text className="text-white text-sm font-semibold">Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
