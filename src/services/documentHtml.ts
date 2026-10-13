@@ -1,11 +1,25 @@
 // Pure string-building only — no filesystem or platform APIs, so this is
 // trivially testable in isolation from expo-print/expo-file-system.
-export function buildDocumentHtml(imageDataUris: string[], docName: string): string {
+const htmlEntities: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+export function buildDocumentHtml(
+  imageDataUris: string[],
+  docName: string,
+): string {
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (character) => htmlEntities[character]);
+  const safeName = escapeHtml(docName);
   const pages = imageDataUris
     .map(
       (uri) => `
       <div class="page">
-        <img src="${uri}" alt="${docName}" />
+        <img src="${escapeHtml(uri)}" alt="${safeName}" />
       </div>`,
     )
     .join("");
@@ -14,7 +28,7 @@ export function buildDocumentHtml(imageDataUris: string[], docName: string): str
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>${docName}</title>
+    <title>${safeName}</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       @page { margin: 0; }

@@ -1,15 +1,16 @@
 /** @type {import('tailwindcss').Config} */
 const colors = {
-  bg: "#0a0a0a",
-  surface: "#151515",
-  "surface-alt": "#1e1e1e",
-  border: "#2a2a2a",
+  bg: "#09090b",
+  surface: "#141417",
+  "surface-alt": "#1c1c20",
+  border: "#27272a",
+  "border-light": "#3f3f46",
   accent: "#2563eb",
-  "accent-light": "#3b82f6",
-  danger: "#ef4444",
-  primary: "#f5f5f5",
-  secondary: "#9ca3af",
-  muted: "#4b5563",
+  "accent-subtle": "rgba(37, 99, 235, 0.15)",
+  primary: "#fafafa",
+  secondary: "#a1a1aa",
+  muted: "#71717a",
+  destructive: "#ef4444",
 };
 
 module.exports = {
@@ -18,18 +19,12 @@ module.exports = {
   theme: {
     extend: {
       colors,
-      spacing: {
-        xs: 4,
-        sm: 8,
-        md: 16,
-        lg: 24,
-        xl: 32,
-        xxl: 48,
-      },
       borderRadius: {
         sm: 6,
         md: 10,
-        lg: 16,
+        lg: 14,
+        xl: 18,
+        "2xl": 22,
         full: 999,
       },
     },

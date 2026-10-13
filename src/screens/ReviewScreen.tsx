@@ -15,6 +15,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useDocumentsStore } from "../store/documentsStore";
+import { ChevronLeftIcon, CloseIcon, DocumentIcon } from "../components/Icons";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList } from "../types";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,8 +29,6 @@ export default function ReviewScreen() {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RoutePropType>();
 
-  // Defensive: route.params (or .images) could theoretically be missing if
-  // this screen is ever reached some other way than the scan flow.
   const initialImages = Array.isArray(route.params?.images)
     ? route.params.images
     : [];
@@ -79,9 +78,6 @@ export default function ReviewScreen() {
 
       setSavingMode(mode);
       try {
-        // One shared action handles id generation, filesystem export, and
-        // persisting the record — the screen just supplies inputs and
-        // navigates once it's done. Store first, navigate second.
         const doc = await createDocument({
           name,
           imageUris: pages,
@@ -91,7 +87,9 @@ export default function ReviewScreen() {
       } catch (e) {
         Alert.alert(
           "Save failed",
-          "Something went wrong while saving the scan.",
+          e instanceof Error
+            ? e.message
+            : "Something went wrong while saving the scan. Please try again.",
         );
         console.error(e);
       } finally {
@@ -103,121 +101,139 @@ export default function ReviewScreen() {
 
   if (pages.length === 0) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-bg px-8">
+      <SafeAreaView className="flex-1 items-center justify-center bg-bg px-6" edges={["top", "bottom"]}>
         <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-        <Text className="text-primary text-lg font-semibold mb-2 text-center">
+        <View className="w-16 h-16 rounded-2xl bg-surface border border-border items-center justify-center mb-4">
+          <DocumentIcon size={28} color="#71717a" />
+        </View>
+        <Text className="text-primary text-base font-semibold mb-1 text-center">
           No pages to review
         </Text>
-        <Text className="text-muted text-base text-center mb-6">
+        <Text className="text-secondary text-xs text-center mb-6 leading-5">
           Go back and scan a document first.
         </Text>
         <TouchableOpacity
-          className="bg-accent rounded-md px-6 py-3"
+          className="bg-accent rounded-full px-6 py-2.5 active:opacity-90"
           onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
         >
-          <Text className="text-white font-bold">Back</Text>
+          <Text className="text-white text-xs font-semibold">Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-bg"
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+    <SafeAreaView className="flex-1 bg-bg" edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        className="flex-1 bg-bg"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
 
-      {/* Header */}
-      <View className="flex-row items-center pt-14 px-6 pb-4 border-b border-border">
-        <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
-          <Text className="text-accent text-xl font-bold">← Back</Text>
-        </TouchableOpacity>
-        <Text className="flex-1 text-primary text-xl font-bold">Review</Text>
-        <Text className="text-muted text-sm">
-          {pages.length} page{pages.length !== 1 ? "s" : ""}
-        </Text>
-      </View>
-
-      {/* Document name input */}
-      <View className="px-6 py-4 border-b border-border">
-        <Text className="text-muted text-sm font-bold uppercase mb-1 tracking-wider">
-          Document name
-        </Text>
-        <TextInput
-          className="bg-surface text-primary border border-border rounded-md px-4 py-3 text-lg placeholder-text-muted selection-text-accent"
-          value={docName}
-          onChangeText={setDocName}
-          placeholder="Enter document name..."
-          maxLength={60}
-        />
-      </View>
-
-      {/* Pages grid */}
-      <FlatList
-        className="flex-1"
-        contentContainerClassName="p-4 pb-32"
-        data={pages}
-        keyExtractor={(_, i) => i.toString()}
-        numColumns={2}
-        renderItem={({ item, index }) => (
-          <SafeAreaView className="flex-1 m-2 h-60 rounded-md overflow-hidden bg-surface border border-border">
-            <Image
-              source={{ uri: item }}
-              className="w-full h-full"
-              resizeMode="cover"
-            />
-            <View className="absolute bottom-2 left-2 bg-black/65 rounded-full w-6 h-6 items-center justify-center">
-              <Text className="text-white text-[11px] font-bold">
-                {index + 1}
-              </Text>
-            </View>
+        {/* Header */}
+        <View className="px-5 pt-3 pb-3.5 border-b border-border flex-row items-center justify-between">
+          <View className="flex-row items-center flex-1 mr-3">
             <TouchableOpacity
-              className="absolute top-2 right-2 bg-red-500/85 rounded-full w-6 h-6 items-center justify-center"
-              onPress={() => removePage(index)}
-              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              onPress={() => navigation.goBack()}
+              className="w-9 h-9 rounded-full bg-surface border border-border items-center justify-center mr-3 active:bg-surface-alt"
+              activeOpacity={0.7}
             >
-              <Text className="text-white text-[11px] font-bold">✕</Text>
+              <ChevronLeftIcon size={18} color="#fafafa" />
             </TouchableOpacity>
-          </SafeAreaView>
-        )}
-      />
+            <Text className="text-primary text-lg font-semibold tracking-tight">
+              Review Scan
+            </Text>
+          </View>
+          <View className="bg-surface border border-border px-3 py-1 rounded-full">
+            <Text className="text-secondary text-xs font-medium">
+              {pages.length} {pages.length === 1 ? "page" : "pages"}
+            </Text>
+          </View>
+        </View>
 
-      {/* Export button */}
-      <SafeAreaView className="absolute bottom-0 left-0 right-0 p-6 bg-bg border-t border-border gap-3">
-        <TouchableOpacity
-          className={`bg-accent rounded-md p-4 items-center justify-center h-[52px] ${
-            exporting ? "opacity-60" : ""
-          }`}
-          onPress={() => handleSave("pdf")}
-          disabled={exporting}
-          activeOpacity={0.85}
-        >
-          {exporting && savingMode === "pdf" ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text className="text-lg font-bold text-white">
-              Export as PDF →
-            </Text>
+        {/* Document name input */}
+        <View className="px-5 py-3 border-b border-border">
+          <Text className="text-secondary text-xs font-medium mb-1.5">
+            Document Name
+          </Text>
+          <TextInput
+            className="bg-surface text-primary border border-border rounded-xl px-3.5 py-2.5 text-sm font-medium placeholder:text-muted"
+            value={docName}
+            onChangeText={setDocName}
+            placeholder="Enter document name..."
+            maxLength={60}
+            selectionColor={colors.accent}
+          />
+        </View>
+
+        {/* Pages grid */}
+        <FlatList
+          className="flex-1"
+          contentContainerClassName="px-3.5 pt-3 pb-32"
+          data={pages}
+          keyExtractor={(_, i) => i.toString()}
+          numColumns={2}
+          renderItem={({ item, index }) => (
+            <View className="flex-1 m-1.5 h-56 rounded-2xl overflow-hidden bg-surface border border-border relative">
+              <Image
+                source={{ uri: item }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+              <View className="absolute bottom-2.5 left-2.5 bg-black/70 border border-white/10 px-2 py-0.5 rounded-full">
+                <Text className="text-zinc-200 text-[10px] font-medium">
+                  Page {index + 1}
+                </Text>
+              </View>
+              <TouchableOpacity
+                className="absolute top-2.5 right-2.5 bg-black/60 border border-white/10 w-7 h-7 rounded-full items-center justify-center active:bg-destructive"
+                onPress={() => removePage(index)}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <CloseIcon size={11} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          className={`bg-surface rounded-md p-4 items-center justify-center h-[52px] border border-border ${
-            exporting ? "opacity-60" : ""
-          }`}
-          onPress={() => handleSave("images")}
-          disabled={exporting}
-          activeOpacity={0.85}
-        >
-          {exporting && savingMode === "images" ? (
-            <ActivityIndicator color={colors.accent} />
-          ) : (
-            <Text className="text-xl text-accent font-bold">
-              Save as Images
-            </Text>
-          )}
-        </TouchableOpacity>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+        />
+
+        {/* Export / Save dock */}
+        <View className="absolute bottom-0 left-0 right-0 px-5 pt-3 pb-6 bg-bg/95 border-t border-border flex-row gap-3">
+          <TouchableOpacity
+            className={`flex-1 h-12 rounded-xl bg-surface border border-border items-center justify-center active:bg-surface-alt ${
+              exporting ? "opacity-60" : ""
+            }`}
+            onPress={() => handleSave("images")}
+            disabled={exporting}
+            activeOpacity={0.8}
+          >
+            {exporting && savingMode === "images" ? (
+              <ActivityIndicator color={colors.accent} size="small" />
+            ) : (
+              <Text className="text-secondary text-xs font-semibold">
+                Save as Images
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className={`flex-1 h-12 rounded-xl bg-accent items-center justify-center active:opacity-90 ${
+              exporting ? "opacity-60" : ""
+            }`}
+            onPress={() => handleSave("pdf")}
+            disabled={exporting}
+            activeOpacity={0.8}
+          >
+            {exporting && savingMode === "pdf" ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <Text className="text-white text-xs font-semibold">
+                Export as PDF
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

@@ -5,6 +5,8 @@ export type ScannedDoc = {
   pageCount: number;
   createdAt: number;
   updatedAt?: number;
+  /** Durable app-private originals used for thumbnails and future exports. */
+  sourceUris?: string[];
   pdfUri?: string;
   imageUris?: string[];
 };

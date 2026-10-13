@@ -13,10 +13,6 @@ function safeFileName(name: string): string {
   );
 }
 
-function toLocalPath(uri: string): string {
-  return uri.startsWith("file://") ? uri.replace(/^file:\/\//, "") : uri;
-}
-
 // Android only: copies an already-persisted app-private file into the
 // public MediaStore (Downloads/Pictures) so it's visible outside the app,
 // without disturbing the private copy the app itself reads for preview.
@@ -30,7 +26,9 @@ async function publishToMediaStore(
   await ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
     { name: displayName, parentFolder, mimeType },
     collection,
-    toLocalPath(localFile.uri),
+    localFile.uri.startsWith("file://")
+      ? localFile.uri.replace(/^file:\/\//, "")
+      : localFile.uri,
   );
 }
 
@@ -60,16 +58,39 @@ function sourceDirFor(id: string): Directory {
 // permanently from then on. Both formats are just different outputs
 // derived from this one source, which is what makes it possible to add
 // the missing format to an already-saved doc later without rescanning.
-async function ensureSourcePages(id: string, pages?: string[]): Promise<string[]> {
+/** Persist scanned pages so thumbnails and exports survive scanner cache cleanup. */
+export async function persistSourcePages(
+  id: string,
+  pages?: string[],
+  expectedPageCount = pages?.length,
+): Promise<string[]> {
   const sourceDir = sourceDirFor(id);
 
   if (sourceDir.exists) {
     const existing = sourceDir
       .list()
       .filter((entry): entry is File => entry instanceof File)
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    if (existing.length > 0) {
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
+      );
+    if (
+      existing.length > 0 &&
+      (expectedPageCount === undefined || existing.length === expectedPageCount)
+    ) {
       return existing.map((f) => f.uri);
+    }
+    // A previous interrupted save may have left only part of the source set.
+    // Never treat that partial set as a complete document.
+    if (pages && existing.length > 0) {
+      const pagesAreStoredSources = pages.every((uri) =>
+        uri.startsWith(sourceDir.uri),
+      );
+      if (pagesAreStoredSources) {
+        throw new Error(
+          "Some saved scan pages are missing. Please rescan this document.",
+        );
+      }
+      sourceDir.delete();
     }
   }
 
@@ -86,15 +107,32 @@ async function ensureSourcePages(id: string, pages?: string[]): Promise<string[]
   for (let i = 0; i < pages.length; i++) {
     const src = new File(pages[i]);
     const ext = (src.extension || ".jpg").replace(/^\./, "") || "jpg";
-    const dest = new File(sourceDir, `page-${String(i + 1).padStart(3, "0")}.${ext}`);
+    const dest = new File(
+      sourceDir,
+      `page-${String(i + 1).padStart(3, "0")}.${ext}`,
+    );
     try {
       await src.copy(dest);
     } catch {
-      await dest.write(await src.bytes());
+      try {
+        await dest.write(await src.bytes());
+      } catch {
+        throw new Error(
+          "A scanned page is no longer available. Please rescan.",
+        );
+      }
     }
     persisted.push(dest.uri);
   }
   return persisted;
+}
+
+/** Remove the app-private source pages and generated PDF for a document. */
+export function deleteDocumentFiles(id: string): void {
+  const sourceDir = sourceDirFor(id);
+  if (sourceDir.exists) sourceDir.delete();
+  const pdfFile = new File(scansDirFor(), `${id}.pdf`);
+  if (pdfFile.exists) pdfFile.delete();
 }
 
 // pages is optional: pass freshly scanned page URIs on first export for a
@@ -103,9 +141,13 @@ export async function generatePdf(
   id: string,
   docName: string,
   pages?: string[],
+  expectedPageCount?: number,
 ): Promise<string> {
-  const sourceUris = await ensureSourcePages(id, pages);
-  const html = buildDocumentHtml(await Promise.all(sourceUris.map(toDataUri)), docName);
+  const sourceUris = await persistSourcePages(id, pages, expectedPageCount);
+  const html = buildDocumentHtml(
+    await Promise.all(sourceUris.map(toDataUri)),
+    docName,
+  );
   const { uri: tmpUri } = await Print.printToFileAsync({ html });
 
   const scansDir = scansDirFor();
@@ -138,8 +180,9 @@ export async function generateImages(
   id: string,
   docName: string,
   pages?: string[],
+  expectedPageCount?: number,
 ): Promise<string[]> {
-  const uris = await ensureSourcePages(id, pages);
+  const uris = await persistSourcePages(id, pages, expectedPageCount);
 
   if (Platform.OS === "android") {
     await Promise.all(
