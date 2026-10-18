@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#111317]" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Lens - PDF Preview &amp; Confirmation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            appBg: '#111317',
+            surface: '#111317',
+            surfaceContainer: '#1E2023',
+            surfaceContainerHigh: '#282A2D',
+            surfaceContainerHighest: '#333538',
+            appBorder: '#282A2D',
+            outlineVariant: '#464554',
+            appAccent: '#6366F1',
+            primaryContainer: '#8083FF',
+            onSurface: '#E2E2E6',
+            onSurfaceVariant: '#C7C4D7'
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #111317;
+      color: #E2E2E6;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .aspect-a4 {
+      aspect-ratio: 1 / 1.414;
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-[#111317] text-[#E2E2E6] antialiased selection:bg-[#6366F1] selection:text-white min-h-screen flex flex-col justify-start items-center">
+<!-- Mobile Viewport Container (True mobile 390px x 844px framing) -->
+<div class="w-full max-w-[390px] h-[844px] max-h-[844px] bg-[#111317] flex flex-col relative overflow-hidden select-none">
+<!-- Status Bar Spacer (Google / iOS standard top bar) -->
+<div class="h-11 w-full flex items-center justify-between px-6 pt-3 text-xs text-[#C7C4D7] shrink-0 z-30">
+<span class="font-semibold text-sm tracking-tight text-white">9:41</span>
+<div class="flex items-center space-x-2">
+<!-- Signal / Wifi / Battery -->
+<svg class="w-4 h-4 fill-current text-white/90" viewbox="0 0 24 24">
+<path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9z"></path>
+</svg>
+<svg class="w-4 h-4 fill-current text-white/90" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0012 4z"></path>
+</svg>
+<div class="w-5 h-2.5 border border-white/80 rounded-xs p-0.5 flex items-center">
+<div class="h-full w-3 bg-white rounded-2xs"></div>
+</div>
+</div>
+</div>
+<!-- State Switcher Segmented Control (Preview State vs Delete Dialog) -->
+<div class="px-4 py-2 shrink-0 z-20">
+<div class="bg-[#1E2023] p-1 rounded-full flex items-center justify-between text-xs border border-[#282A2D]">
+<button class="flex-1 py-1.5 px-3 rounded-full font-medium text-center bg-[#282A2D] text-white shadow-sm transition-all text-[12px]" id="tab-preview" onclick="toggleDeleteModal(false)">
+          Preview State
+        </button>
+<button class="flex-1 py-1.5 px-3 rounded-full font-medium text-center text-[#C7C4D7] hover:text-white transition-all text-[12px]" id="tab-dialog" onclick="toggleDeleteModal(true)">
+          Delete Dialog
+        </button>
+</div>
+</div>
+<!-- Google Material 3 Top App Bar -->
+<header class="h-14 px-2 flex items-center justify-between border-b border-[#282A2D]/70 shrink-0 z-20 bg-[#111317]">
+<!-- Back button (min 44x44px hit target) -->
+<button aria-label="Back" class="w-11 h-11 rounded-full flex items-center justify-center text-[#E2E2E6] hover:bg-[#1E2023] active:bg-[#282A2D] transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">arrow_back</span>
+</button>
+<!-- Document title -->
+<div class="flex-1 px-2 text-center">
+<h1 class="text-sm font-medium text-[#E2E2E6] tracking-normal truncate">
+          Tax Return 2025 Form 1040
+        </h1>
+</div>
+<!-- Delete action button (min 44x44px hit target) -->
+<button aria-label="Delete document" class="w-11 h-11 rounded-full flex items-center justify-center text-[#C7C4D7] hover:text-red-400 hover:bg-[#1E2023] active:bg-[#282A2D] transition-colors" onclick="toggleDeleteModal(true)" type="button">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</header>
+<!-- PDF Document Viewport Area -->
+<main class="flex-1 px-4 py-3 flex flex-col items-center justify-center relative overflow-hidden">
+<!-- Realistic IRS 1040 Document Card with Google Elevation -->
+<div class="w-full max-w-[326px] aspect-a4 bg-[#F8F9FA] rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.55)] border border-black/10 flex flex-col p-5 select-none relative overflow-hidden">
+<!-- Document Header -->
+<div class="flex justify-between items-start border-b border-black/20 pb-2.5">
+<div>
+<div class="text-[8px] font-bold text-black uppercase tracking-wider font-mono">Department of the Treasury — Internal Revenue Service</div>
+<div class="text-[13px] font-extrabold text-black tracking-tight mt-0.5">U.S. Individual Income Tax Return</div>
+</div>
+<div class="text-[11px] font-mono font-bold text-black border border-black px-1.5 py-0.5 rounded bg-white shadow-xs">2025</div>
+</div>
+<!-- Simulated Document Sections / Fields -->
+<div class="mt-3.5 space-y-2">
+<div class="h-2 w-3/4 bg-black/85 rounded-full"></div>
+<div class="h-1.5 w-full bg-black/20 rounded-full"></div>
+<div class="h-1.5 w-11/12 bg-black/20 rounded-full"></div>
+<div class="h-1.5 w-4/5 bg-black/20 rounded-full"></div>
+</div>
+<!-- Form Table Preview -->
+<div class="mt-4 p-2.5 bg-black/[0.03] rounded-lg border border-black/10 space-y-2">
+<div class="flex justify-between text-[9px] text-black/70 font-mono">
+<span>1a. Total amount from Form(s) W-2, box 1</span>
+<span class="font-semibold text-black/90">$92,450.00</span>
+</div>
+<div class="flex justify-between text-[9px] text-black/70 font-mono">
+<span>2b. Taxable interest</span>
+<span class="font-semibold text-black/90">$1,120.00</span>
+</div>
+<div class="flex justify-between text-[9px] text-black/70 font-mono">
+<span>3b. Ordinary dividends</span>
+<span class="font-semibold text-black/90">$840.00</span>
+</div>
+<div class="flex justify-between text-[9px] text-black font-mono font-bold pt-1.5 border-t border-black/15">
+<span>11. Total Adjusted Income</span>
+<span class="font-bold text-black">$94,410.00</span>
+</div>
+</div>
+<!-- Secondary lines -->
+<div class="mt-3.5 space-y-1.5">
+<div class="h-1.5 w-full bg-black/15 rounded-full"></div>
+<div class="h-1.5 w-5/6 bg-black/15 rounded-full"></div>
+</div>
+<!-- Document Footer -->
+<div class="mt-auto pt-3 flex justify-between items-center text-[8px] text-black/50 font-mono border-t border-black/10">
+<span>Form 1040 (2025)</span>
+<span>Cat. No. 11320B</span>
+<span>Page 2 of 4</span>
+</div>
+</div>
+<!-- Floating Material 3 Page Pill Indicator '2 / 4' -->
+<div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+<div class="bg-[#1E2023]/95 backdrop-blur-md text-[11px] font-medium tracking-wide text-white px-3 py-1 rounded-full border border-white/10 shadow-lg flex items-center gap-1.5">
+<span class="text-white font-semibold">2</span>
+<span class="text-[#C7C4D7]/60">/</span>
+<span class="text-[#C7C4D7]">4</span>
+</div>
+</div>
+</main>
+<!-- Pinned Bottom Action Bar (Respecting iOS/Android Home Inset) -->
+<footer class="shrink-0 bg-[#111317]/95 backdrop-blur-lg border-t border-[#282A2D] px-5 pt-3 pb-6 flex flex-col space-y-2.5 z-20">
+<!-- Primary: Share PDF -->
+<button class="w-full h-12 rounded-full bg-[#6366F1] hover:bg-[#5558E6] active:scale-[0.99] text-white font-medium text-sm flex items-center justify-center shadow-lg shadow-[#6366F1]/20 transition-all gap-2" type="button">
+<span class="material-symbols-outlined text-[18px]">share</span>
+<span>Share PDF</span>
+</button>
+<!-- Secondary: Add another format -->
+<button class="w-full h-12 rounded-full border border-[#2D333F] text-gray-200 bg-[#161920] hover:bg-[#1E2023] active:bg-[#282A2D] font-medium text-sm flex items-center justify-center transition-colors gap-2" type="button">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span>Add another format</span>
+</button>
+<!-- iOS Home Indicator bar -->
+<div class="w-32 h-1 bg-white/20 rounded-full mx-auto mt-1"></div>
+</footer>
+<!-- DELETE CONFIRMATION MODAL OVERLAY (Material 3 Native-Style Dialog) -->
+<div aria-labelledby="modal-title" aria-modal="true" class="hidden absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-6 transition-opacity" id="delete-modal" role="dialog">
+<!-- Dialog Surface Card (Material 3 Dark Container, 28px rounded corners) -->
+<div class="w-full max-w-[320px] bg-[#1E2023] border border-[#282A2D] rounded-[24px] p-6 shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150">
+<!-- Dialog Icon & Headline -->
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center text-red-400 shrink-0">
+<span class="material-symbols-outlined text-[20px]">delete_outline</span>
+</div>
+<h2 class="text-lg font-semibold text-white tracking-tight" id="modal-title">
+            Delete document?
+          </h2>
+</div>
+<!-- Verbatim Warning Copy -->
+<p class="text-xs text-[#C7C4D7] mt-3 leading-relaxed">
+          Deletes this document from Lens. Copies already saved to Downloads or Pictures are not removed.
+        </p>
+<!-- Dialog Action Buttons -->
+<div class="mt-6 flex flex-col space-y-2">
+<!-- Destructive Delete Button -->
+<button class="w-full h-11 rounded-full bg-red-500 hover:bg-red-600 active:bg-red-700 text-white text-xs font-semibold flex items-center justify-center shadow-md shadow-red-500/25 transition-all" onclick="toggleDeleteModal(false)" type="button">
+            Delete from Lens
+          </button>
+<!-- Subtle Cancel Button -->
+<button class="w-full h-11 rounded-full bg-transparent hover:bg-[#282A2D] text-[#C7C4D7] hover:text-white border border-[#282A2D] text-xs font-medium flex items-center justify-center transition-colors" onclick="toggleDeleteModal(false)" type="button">
+            Cancel
+          </button>
+</div>
+</div>
+</div>
+</div>
+<script>
+    function toggleDeleteModal(show) {
+      const modal = document.getElementById('delete-modal');
+      const tabPreview = document.getElementById('tab-preview');
+      const tabDialog = document.getElementById('tab-dialog');
+
+      if (show) {
+        modal.classList.remove('hidden');
+        tabDialog.className = "flex-1 py-1.5 px-3 rounded-full font-medium text-center bg-[#282A2D] text-white shadow-sm transition-all text-[12px]";
+        tabPreview.className = "flex-1 py-1.5 px-3 rounded-full font-medium text-center text-[#C7C4D7] hover:text-white transition-all text-[12px]";
+      } else {
+        modal.classList.add('hidden');
+        tabPreview.className = "flex-1 py-1.5 px-3 rounded-full font-medium text-center bg-[#282A2D] text-white shadow-sm transition-all text-[12px]";
+        tabDialog.className = "flex-1 py-1.5 px-3 rounded-full font-medium text-center text-[#C7C4D7] hover:text-white transition-all text-[12px]";
+      }
+    }
+  </script>
+</body></html>

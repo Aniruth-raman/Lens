@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,10 +14,11 @@ import {
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useDocumentsStore } from "../store/documentsStore";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList } from "../types";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { colors } = tailwindConfig;
 
@@ -27,42 +28,42 @@ type RoutePropType = RouteProp<RootStackParamList, "Review">;
 export default function ReviewScreen() {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RoutePropType>();
-
-  const initialImages = Array.isArray(route.params?.images)
-    ? route.params.images
-    : [];
+  const insets = useSafeAreaInsets();
 
   const createDocument = useDocumentsStore((s) => s.createDocument);
   const exporting = useDocumentsStore((s) => s.exporting);
 
-  const [pages, setPages] = useState<string[]>(initialImages);
+  const [pages, setPages] = useState<string[]>(route.params.images);
   const [docName, setDocName] = useState(() => {
-    const dateStr = new Date().toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-    return `Scan ${dateStr}`;
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `Scan ${yyyy}-${mm}-${dd}`;
   });
   const [savingMode, setSavingMode] = useState<"pdf" | "images" | null>(null);
+  const saveInProgress = useRef(false);
 
   const removePage = (index: number) => {
-    setPages((prev) =>
-      prev.length > 1 ? prev.filter((_, i) => i !== index) : prev,
-    );
+    if (pages.length <= 1) {
+      Alert.alert(
+        "Cannot remove page",
+        "A document must have at least one scanned page.",
+      );
+      return;
+    }
+    setPages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = async (mode: "pdf" | "images") => {
+    if (saveInProgress.current) return;
+
     const name = docName.trim();
     if (!name) {
       Alert.alert("Name required", "Please enter a name for this document.");
       return;
     }
-    if (pages.length === 0) {
-      Alert.alert("No pages", "This document has no scanned pages.");
-      return;
-    }
-
+    saveInProgress.current = true;
     setSavingMode(mode);
     try {
       const doc = await createDocument({
@@ -70,8 +71,10 @@ export default function ReviewScreen() {
         imageUris: pages,
         exportMode: mode,
       });
-      navigation.navigate("PdfPreview", { id: doc.id });
+      navigation.replace("PdfPreview", { id: doc.id });
     } catch (e) {
+      saveInProgress.current = false;
+      setSavingMode(null);
       Alert.alert(
         "Save failed",
         e instanceof Error
@@ -79,113 +82,113 @@ export default function ReviewScreen() {
           : "Something went wrong while saving the scan. Please try again.",
       );
       console.error("Save error:", e);
-    } finally {
-      setSavingMode(null);
     }
   };
 
-  if (pages.length === 0) {
-    return (
-      <SafeAreaView
-        className="flex-1 items-center justify-center bg-bg px-6"
-        edges={["top", "bottom"]}
-      >
-        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-        <Text className="text-primary text-base font-semibold mb-1 text-center">
-          No pages to review
-        </Text>
-        <Text className="text-muted text-sm text-center mb-6">
-          Go back and scan a document first.
-        </Text>
-        <TouchableOpacity
-          className="bg-accent rounded-lg px-5 py-2.5 min-h-[44px] items-center justify-center"
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Go back to scanner"
-        >
-          <Text className="text-white text-sm font-semibold">Back</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
+  const isAtLimit = pages.length >= 10;
 
   return (
-    <SafeAreaView className="flex-1 bg-bg" edges={["top", "bottom"]}>
+    <SafeAreaView className="flex-1 bg-surface" edges={["top", "right", "left"]}>
       <KeyboardAvoidingView
-        className="flex-1 bg-bg"
+        className="flex-1 bg-surface"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+        <StatusBar barStyle="light-content" backgroundColor={colors.surface} />
 
-        <View className="px-5 pt-3 pb-5 border-b border-border gap-4">
-          <View className="flex-row items-center justify-between">
-            <TouchableOpacity
-              className="flex-row items-center min-h-[44px] px-3 rounded-full bg-surface border border-border"
-              onPress={() => navigation.goBack()}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-            >
-              <Text className="text-accent text-sm font-semibold">←</Text>
-              <Text className="text-primary text-sm font-medium ml-2">Back</Text>
-            </TouchableOpacity>
-            <View className="bg-surface border border-border rounded-full px-3 py-2">
-              <Text className="text-secondary text-xs font-semibold">
-                {String(pages.length).padStart(2, "0")} {pages.length === 1 ? "PAGE" : "PAGES"}
-              </Text>
-            </View>
-          </View>
-          <View>
-            <Text className="text-muted text-[11px] font-semibold tracking-[1.5px] mb-2">
-              DOCUMENT NAME
-            </Text>
+        {/* App Bar / Navigation Header (44px touch targets) */}
+        <View className="h-14 px-3 flex-row items-center justify-between border-b border-outlineVariant/60 shrink-0 bg-surface">
+          <TouchableOpacity
+            className="w-11 h-11 rounded-full items-center justify-center"
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={22} color="#E2E2E6" />
+          </TouchableOpacity>
+
+          {/* Editable Document Name Input Pill */}
+          <View className="flex-1 mx-1.5 flex-row items-center bg-surfaceContainer/80 border border-outlineVariant/80 rounded-full px-3 py-1.5">
             <TextInput
-              className="bg-surface text-primary border border-border rounded-xl px-4 py-3.5 text-base font-medium"
+              className="flex-1 text-[13px] font-medium text-white tracking-tight p-0"
               value={docName}
               onChangeText={setDocName}
               placeholder="Document name"
+              placeholderTextColor={colors.onSurfaceVariant}
               maxLength={60}
               selectionColor={colors.accent}
-              accessibilityLabel="Document name"
+              accessibilityLabel="Document name input"
             />
+            <MaterialIcons
+              name="edit"
+              size={15}
+              color={colors.onSurfaceVariant}
+              style={{ marginLeft: 6 }}
+            />
+          </View>
+
+          {/* Page Counter Badge */}
+          <View className="pl-1">
+            <View className="bg-surfaceContainer px-2.5 py-1 rounded-full border border-outlineVariant">
+              <Text className="text-[12px] font-mono font-medium text-gray-300">
+                {pages.length} / 10
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* 10 page limit warning */}
-        {pages.length >= 10 && (
-          <View className="mx-5 mt-3 p-3 rounded-lg bg-surface border border-border">
-            <Text className="text-secondary text-xs text-center font-medium">
-              Maximum 10 pages per scan session reached.
+
+        {/* Limit Banner (Material 3 Subtle Alert) */}
+        {isAtLimit && (
+          <View className="px-4 py-2.5 bg-warningContainer/80 border-b border-warningBorder/50 flex-row items-center space-x-2.5 shrink-0">
+            <MaterialIcons
+              name="warning"
+              size={18}
+              color={colors.warning}
+              style={{ marginRight: 8 }}
+            />
+            <Text className="text-[12px] text-amber-100 font-medium leading-snug flex-1">
+              10 page limit reached. Export or delete pages to continue.
             </Text>
           </View>
         )}
 
-        {/* Body: scanned pages shown large, in order, scrollable, with per-page remove */}
+        {/* Vertically Scrolling Reel Container */}
         <FlatList
           className="flex-1"
-          contentContainerClassName="p-5 pb-6 gap-4"
+          contentContainerClassName="px-5 py-4 pb-40"
           data={pages}
-          keyExtractor={(_, i) => i.toString()}
+          keyExtractor={(_, i) => String(i)}
           renderItem={({ item, index }) => (
-            <View className="bg-surface rounded-2xl border border-border overflow-hidden">
-              <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-                <Text className="text-secondary text-xs font-semibold tracking-[1px]">
-                  PAGE {String(index + 1).padStart(2, "0")}
+            <View className="relative bg-white text-gray-900 rounded-2xl shadow-xl border border-gray-200 overflow-hidden aspect-[1/1.34] p-4 flex-col justify-between mb-4">
+              {/* Page Number Badge (top-left) */}
+              <View className="absolute top-3 left-3 z-10 bg-black/85 px-2.5 py-0.5 rounded-full shadow-sm flex-row items-center">
+                <Text className="text-[11px] font-mono font-medium text-white">
+                  Page {index + 1}
                 </Text>
-                <TouchableOpacity
-                  className={`min-h-[36px] px-3 rounded-full border border-border flex-row items-center ${pages.length === 1 ? "opacity-40" : "bg-surface-alt"}`}
-                  onPress={() => removePage(index)}
-                  disabled={pages.length === 1}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: pages.length === 1 }}
-                  accessibilityLabel={`Remove page ${index + 1}`}
-                >
-                  <Text className="text-destructive text-xs font-semibold">Remove</Text>
-                </TouchableOpacity>
               </View>
-              <View className="h-80 bg-surface-alt relative items-center justify-center">
+
+              {/* Remove Page Button (top-right, >=44px touch target) */}
+              <TouchableOpacity
+                className="absolute top-1 right-1 z-10 w-11 h-11 items-center justify-center active:scale-95"
+                onPress={() => removePage(index)}
+                disabled={pages.length === 1}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove page ${index + 1}`}
+              >
+                <View
+                  className={`w-7 h-7 rounded-full bg-black/80 items-center justify-center shadow-md ${
+                    pages.length === 1 ? "opacity-30" : ""
+                  }`}
+                >
+                  <Ionicons name="close" size={16} color="white" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Scanned Image Sheet Preview */}
+              <View className="w-full h-full items-center justify-center">
                 <Image
                   source={{ uri: item }}
-                  className="w-full h-full"
+                  className="w-full h-full rounded-md"
                   resizeMode="contain"
                 />
               </View>
@@ -193,56 +196,73 @@ export default function ReviewScreen() {
           )}
         />
 
-        <View className="px-5 pt-4 pb-4 border-t border-border bg-bg gap-3">
-          <Text className="text-muted text-[11px] font-semibold tracking-[1.5px]">
-            SAVE YOUR SCAN AS
-          </Text>
+        {/* Fixed Bottom Action Bar */}
+        <View
+          className="absolute bottom-0 left-0 right-0 bg-[#111317]/95 border-t border-outlineVariant/80 px-5 pt-3 z-40"
+          style={{ paddingBottom: insets.bottom + 12 }}
+        >
+          {/* Export Progress Indicator (shown when exporting) */}
+          {exporting && (
+            <View className="space-y-1.5 pb-2.5">
+              <View className="flex-row items-center justify-between text-xs mb-1">
+                <View className="flex-row items-center space-x-1.5">
+                  <View className="w-2 h-2 rounded-full bg-accent mr-2" />
+                  <Text className="text-gray-200 font-medium text-xs">
+                    {savingMode === "pdf"
+                      ? "Exporting PDF..."
+                      : "Saving images..."}
+                  </Text>
+                </View>
+                <ActivityIndicator color={colors.accent} size="small" />
+              </View>
+              <View className="w-full h-1.5 bg-surfaceContainer rounded-full overflow-hidden border border-outlineVariant">
+                <View className="h-full bg-accent rounded-full w-3/4" />
+              </View>
+            </View>
+          )}
+
+          {/* Primary Action: Export as PDF */}
           <TouchableOpacity
-            className={`h-14 rounded-2xl bg-accent items-center justify-center ${
-              exporting ? "opacity-60" : ""
+            className={`w-full h-12 rounded-full bg-accent flex-row items-center justify-center shadow-lg shadow-accent/25 active:scale-[0.99] mb-2.5 ${
+              exporting ? "opacity-50" : ""
             }`}
             onPress={() => handleSave("pdf")}
-            disabled={exporting}
+            disabled={exporting || savingMode !== null}
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel="Export as PDF"
           >
-            {exporting && savingMode === "pdf" ? (
-              <View className="flex-row items-center gap-2">
-                <ActivityIndicator color={colors.primary} size="small" />
-                <Text className="text-white text-sm font-semibold">
-                  Exporting PDF...
-                </Text>
-              </View>
-            ) : (
-              <Text className="text-white text-sm font-semibold">
-                Export as PDF
-              </Text>
-            )}
+            <Ionicons
+              name="document-text"
+              size={19}
+              color="white"
+              style={{ marginRight: 8 }}
+            />
+            <Text className="text-white font-medium text-[14px]">
+              Export as PDF
+            </Text>
           </TouchableOpacity>
 
+          {/* Secondary Action: Save as Images */}
           <TouchableOpacity
-            className={`h-14 rounded-2xl bg-surface border border-border items-center justify-center ${
-              exporting ? "opacity-60" : ""
+            className={`w-full h-12 rounded-full bg-[#161920] border border-outlineSubtle flex-row items-center justify-center active:scale-[0.99] ${
+              exporting ? "opacity-50" : ""
             }`}
             onPress={() => handleSave("images")}
-            disabled={exporting}
+            disabled={exporting || savingMode !== null}
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel="Save as Images"
           >
-            {exporting && savingMode === "images" ? (
-              <View className="flex-row items-center gap-2">
-                <ActivityIndicator color={colors.accent} size="small" />
-                <Text className="text-primary text-sm font-semibold">
-                  Saving images...
-                </Text>
-              </View>
-            ) : (
-              <Text className="text-primary text-sm font-semibold">
-                Save as Images
-              </Text>
-            )}
+            <Ionicons
+              name="images"
+              size={19}
+              color={colors.onSurfaceVariant}
+              style={{ marginRight: 8 }}
+            />
+            <Text className="text-gray-200 font-medium text-[14px]">
+              Save as Images
+            </Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

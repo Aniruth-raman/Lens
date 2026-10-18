@@ -8,6 +8,7 @@ A React Native document scanner app built with Expo. Scan documents using your p
 - 📄 Multi-page scan support (up to 10 pages per session)
 - 🗂️ Gallery to browse all scanned documents
 - 📑 PDF export via `expo-print`
+- 🖼️ Save scanned pages as images and add the other format later
 - 📤 Share PDFs via system share sheet
 - 🗑️ Delete documents (removes the Lens record and its private source/PDF files)
 
@@ -59,26 +60,7 @@ app.json                 # Expo config with plugin + permissions
 npm install
 ```
 
-### 3. Configure EAS
-
-```bash
-eas build:configure
-```
-
-This creates `eas.json`. Make sure it has a `development` profile:
-
-```json
-{
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    }
-  }
-}
-```
-
-### 4. Build dev client
+### 3. Build the development client
 
 > ⚠️ `react-native-document-scanner-plugin` requires a development build — it will NOT work in Expo Go.
 
@@ -92,7 +74,7 @@ eas build --profile development --platform ios
 
 Install the resulting `.apk` / `.ipa` on your device.
 
-### 5. Start dev server
+### 4. Start the dev server
 
 ```bash
 npx expo start --dev-client
@@ -109,7 +91,7 @@ GalleryScreen
                        └─ ReviewScreen
                             └─ [Export as PDF / Save as Images]
                                  └─ PdfPreviewScreen
-                                      └─ [Add another format / Share PDF]
+                                      └─ [Create missing format / Share PDF]
                                            └─ Gallery
 ```
 
@@ -117,18 +99,6 @@ Scanned pages and PDFs are kept in app-private document storage so they remain
 available for previews and later format exports. On Android, exports are also
 copied to Downloads/Lens or Pictures/Lens. Deleting a Lens document removes its
 private files; copies already exported to shared Android storage remain there.
-
-## Android permission note
-
-You don't need to request camera permissions manually unless another plugin in your project adds `<uses-permission android:name="android.permission.CAMERA" />` to `AndroidManifest.xml`. If you get a "Permission Denial" error opening the camera, add this before your export call:
-
-```tsx
-import { Platform, PermissionsAndroid } from "react-native";
-
-if (Platform.OS === "android") {
-  await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-}
-```
 
 ## PDF preview
 
