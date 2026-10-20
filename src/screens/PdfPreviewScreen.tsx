@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, StatusBar, Text, TouchableOpacity, View, ViewToken } from "react-native";
 import Pdf from "react-native-pdf";
 import * as Sharing from "expo-sharing";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
@@ -37,6 +37,11 @@ export default function PdfPreviewScreen() {
   const [deleting, setDeleting] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<string>[] }) => {
+    const visiblePage = viewableItems.find((item) => item.isViewable && item.index != null);
+    if (visiblePage?.index != null) setPage(visiblePage.index + 1);
+  }).current;
 
   useEffect(() => {
     if (doc?.pdfUri && !doc.imageUris?.length) setFormat("pdf");
@@ -138,14 +143,15 @@ export default function PdfPreviewScreen() {
         <Pdf source={{ uri: doc.pdfUri! }} style={{ flex: 1, backgroundColor: colors.paper }} onLoadComplete={(count) => { setTotal(count); setPdfLoading(false); }} onPageChanged={(current, count) => { setPage(current); setTotal(count); }} onError={() => { setPdfLoading(false); setPdfError(true); }} />
         {!pdfLoading && <View className="absolute bottom-5 self-center rounded-full bg-surface-raised px-3 py-1"><Text className="text-text text-xs">Page {page} of {total}</Text></View>}
       </View> : hasImages ? (
-        <FlatList data={doc.imageUris} keyExtractor={(_, index) => String(index)} contentContainerClassName="px-4 py-3 pb-36" renderItem={({ item, index }) => <PageCard uri={item} pageNumber={index + 1} onShare={() => void sharePage(item)} shareDisabled={sharing || !!saving} />} />
+        <FlatList data={doc.imageUris} keyExtractor={(_, index) => String(index)} contentContainerClassName="px-4 py-3 pb-36" viewabilityConfig={viewabilityConfig} onViewableItemsChanged={onViewableItemsChanged} renderItem={({ item, index }) => <PageCard uri={item} pageNumber={index + 1} onShare={() => void sharePage(item)} shareDisabled={sharing || !!saving} />} />
       ) : <View className="flex-1 items-center justify-center"><Text className="text-text-muted text-sm">No preview available.</Text></View>}
 
       <View className="bg-background border-t border-outline px-5 pt-3" style={{ paddingBottom: insets.bottom + 12 }}>
         {both && <View className="flex-row rounded-full border border-outline p-1 mb-2">
           {(["pdf", "images"] as const).map((item) => <TouchableOpacity key={item} accessibilityRole="button" accessibilityLabel={item === "pdf" ? "PDF" : "Images"} accessibilityState={{ selected: format === item, disabled: !!saving }} disabled={!!saving} onPress={() => setFormat(item)} className={`min-h-[44px] flex-1 items-center justify-center rounded-full ${format === item ? "bg-surface-high" : ""}`}><Text className="text-text text-sm">{item === "pdf" ? "PDF" : "Images"}</Text></TouchableOpacity>)}
         </View>}
-        {!hasPdf && <Button onPress={() => void saveFormat("pdf")} loading={saving === "pdf"} disabled={!!saving || sharing} style={{ marginBottom: 8 }}>Save as PDF</Button>}
+        {hasImages && !showPdf && <Button onPress={() => void sharePage(doc.imageUris![page - 1] ?? doc.imageUris![0])} loading={sharing} disabled={!!saving} style={{ marginBottom: 8 }}>{sharing ? "Opening share sheet…" : `Share page ${page}`}</Button>}
+        {!hasPdf && <Button variant={hasImages ? "secondary" : "primary"} onPress={() => void saveFormat("pdf")} loading={saving === "pdf"} disabled={!!saving || sharing} style={{ marginBottom: 8 }}>Save as PDF</Button>}
         {hasPdf && !hasImages && <Button variant="secondary" onPress={() => void saveFormat("images")} loading={saving === "images"} disabled={!!saving || sharing} style={{ marginBottom: 8 }}>Save as images</Button>}
         {hasPdf && showPdf && <Button onPress={() => void sharePdf()} loading={sharing} disabled={!!saving} style={{ marginBottom: 8 }}>{sharing ? "Opening share sheet…" : "Share PDF"}</Button>}
         {saving && <Text accessibilityLiveRegion="polite" className="text-text-muted text-sm text-center">{saving === "pdf" ? "Saving PDF…" : "Saving images…"}</Text>}
