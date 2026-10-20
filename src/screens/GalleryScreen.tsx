@@ -58,9 +58,7 @@ export default function GalleryScreen() {
 
   const startScan = async () => {
     try {
-      const result = await DocumentScanner.scanDocument({
-        maxNumDocuments: 10,
-      });
+      const result = await DocumentScanner.scanDocument();
       if (result.scannedImages && result.scannedImages.length > 0) {
         navigation.navigate("Review", { images: result.scannedImages });
       }

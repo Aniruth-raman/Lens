@@ -108,8 +108,6 @@ export default function ReviewScreen() {
     }
   };
 
-  const isAtLimit = pages.length >= 10;
-
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["top", "right", "left"]}>
       <KeyboardAvoidingView
@@ -153,28 +151,11 @@ export default function ReviewScreen() {
           <View className="pl-1">
             <View className="bg-surfaceContainer px-2.5 py-1 rounded-full border border-outlineVariant">
               <Text className="text-[12px] font-mono font-medium text-gray-300">
-                {pages.length} / 10
+                {pages.length} {pages.length === 1 ? "page" : "pages"}
               </Text>
             </View>
           </View>
         </View>
-
-
-        {/* Limit Banner (Material 3 Subtle Alert) */}
-        {isAtLimit && (
-          <View className="px-4 py-2.5 bg-warningContainer/80 border-b border-warningBorder/50 flex-row items-center space-x-2.5 shrink-0">
-            <MaterialIcons
-              name="warning"
-              size={18}
-              color={colors.warning}
-              style={{ marginRight: 8 }}
-            />
-            <Text className="text-[12px] text-amber-100 font-medium leading-snug flex-1">
-              10 page limit reached. Export or delete pages to continue.
-            </Text>
-          </View>
-        )}
-
         {/* Vertically Scrolling Reel Container */}
         <FlatList
           className="flex-1"
