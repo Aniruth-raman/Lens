@@ -224,15 +224,14 @@ export default function GalleryScreen() {
           </Text>
 
           {searchQuery.trim() ? (
-            <Button
-              variant="secondary"
-              icon="close-circle-outline"
+            <TouchableOpacity
+              className="mt-5 px-4 py-2 rounded-full bg-surface-raised border border-outline min-h-[44px] items-center justify-center"
               onPress={() => setSearchQuery("")}
+              accessibilityRole="button"
               accessibilityLabel="Clear search"
-              style={{ marginTop: 20 }}
             >
-              Clear search
-            </Button>
+              <Text className="text-text text-sm font-medium">Clear search</Text>
+            </TouchableOpacity>
           ) : null}
         </View>
       ) : (
