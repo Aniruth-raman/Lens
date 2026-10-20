@@ -17,9 +17,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0a0a0a",
+        "backgroundColor": "#6366F1",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -32,7 +31,12 @@
           "cameraPermission": "Lens needs camera access to scan documents."
         }
       ],
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": ["./assets/fonts/Inter.ttf"]
+        }
+      ],
       "expo-sharing"
     ],
     "extra": {
