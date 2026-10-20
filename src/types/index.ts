@@ -9,7 +9,10 @@ export type ScannedDoc = {
   sourceUris?: string[];
   pdfUri?: string;
   imageUris?: string[];
+  publishedUris?: { pdf?: string; images?: string[] };
 };
+
+export type ExportProgress = { documentId: string; done: number; total: number };
 
 export type ExportMode = "pdf" | "images";
 

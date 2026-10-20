@@ -1,26 +1,28 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ScannedDoc, ExportMode } from "../types";
+import type { ExportProgress, ExportMode, ScannedDoc } from "../types";
 import {
+  cleanupOrphanedScans,
   deleteDocumentFiles,
   generatePdf,
   generateImages,
+  publishPdf,
   persistSourcePages,
+  migrateLegacyIosDocuments,
 } from "../services/documentExportService";
+import { isScannedDoc } from "./validation";
 
 const STORAGE_KEY = "lens_docs";
+type SavedDoc = ScannedDoc & { exportWarning?: string };
 
 type DocumentsState = {
   docs: ScannedDoc[];
   loading: boolean;
   exporting: boolean;
-
+  exportProgress: ExportProgress | null;
+  exportWarning: { documentId: string; message: string } | null;
   load: () => Promise<void>;
-  createDocument: (args: {
-    name: string;
-    imageUris: string[];
-    exportMode: ExportMode;
-  }) => Promise<ScannedDoc>;
+  createDocument: (args: { name: string; imageUris: string[]; exportMode: ExportMode }) => Promise<SavedDoc>;
   reExportPdf: (id: string) => Promise<void>;
   reExportImages: (id: string) => Promise<void>;
   deleteDoc: (id: string) => Promise<void>;
@@ -30,6 +32,8 @@ type DocumentsState = {
 export const useDocumentsStore = create<DocumentsState>((set, get) => {
   let indexWriteQueue: Promise<void> = Promise.resolve();
   let activeExports = 0;
+  const activeIdCounts = new Map<string, number>();
+  const activeIds = new Set<string>();
 
   const updateIndex = (update: (docs: ScannedDoc[]) => ScannedDoc[]) => {
     const write = indexWriteQueue.then(async () => {
@@ -41,62 +45,72 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => {
     return write;
   };
 
-  const trackExport = async <T>(operation: () => Promise<T>) => {
+  const progressFor = (documentId: string) => (done: number, total: number) =>
+    set({ exportProgress: { documentId, done, total } });
+
+  const trackExport = async <T>(id: string, operation: () => Promise<T>) => {
     activeExports += 1;
-    set({ exporting: true });
+    activeIdCounts.set(id, (activeIdCounts.get(id) ?? 0) + 1);
+    activeIds.add(id);
+    set({ exporting: true, exportProgress: { documentId: id, done: 0, total: 0 }, exportWarning: null });
     try {
       return await operation();
     } finally {
       activeExports -= 1;
-      set({ exporting: activeExports > 0 });
+      const remaining = (activeIdCounts.get(id) ?? 1) - 1;
+      if (remaining === 0) {
+        activeIdCounts.delete(id);
+        activeIds.delete(id);
+      } else activeIdCounts.set(id, remaining);
+      set({ exporting: activeExports > 0, exportProgress: null });
     }
   };
 
   const reExport = async (id: string, mode: ExportMode) => {
     const target = get().docs.find((doc) => doc.id === id);
     if (!target) throw new Error("Document not found.");
+    const pdfPublished = !target.publishedUris || !!target.publishedUris.pdf;
+    const imagesPublished = !target.publishedUris ||
+      (target.publishedUris.images?.length === target.pageCount && target.publishedUris.images.every(Boolean));
+    if (mode === "pdf" && target.pdfUri && pdfPublished) return;
+    if (mode === "images" && target.imageUris?.length === target.pageCount && imagesPublished) return;
 
-    return trackExport(async () => {
-      const result =
-        mode === "pdf"
-          ? {
-              pdfUri: await generatePdf(
-                id,
-                target.name,
-                target.sourceUris,
-                target.pageCount,
-              ),
-            }
-          : {
-              imageUris: await generateImages(
-                id,
-                target.name,
-                target.sourceUris,
-                target.pageCount,
-              ),
-            };
-
-      await updateIndex((docs) =>
-        docs.map((doc) =>
-          doc.id === id ? { ...doc, ...result, updatedAt: Date.now() } : doc,
-        ),
-      );
+    return trackExport(id, async () => {
+      cleanupOrphanedScans(new Set(get().docs.map((doc) => doc.id)), activeIds);
+      const pages = target.sourceUris ?? target.imageUris ?? (target.pageCount === 1 ? [target.thumbUri] : undefined);
+      if (mode === "pdf") {
+        const result = target.pdfUri
+          ? await publishPdf(id, target.name, target.pdfUri)
+          : await generatePdf(id, target.name, pages, target.pageCount, progressFor(id));
+        if (result.warning) set({ exportWarning: { documentId: id, message: result.warning } });
+        await updateIndex((docs) => docs.map((doc) => doc.id === id
+          ? { ...doc, pdfUri: target.pdfUri ?? ("uri" in result && typeof result.uri === "string" ? result.uri : undefined), publishedUris: { ...doc.publishedUris, ...(result.publishedUri ? { pdf: result.publishedUri } : {}) }, updatedAt: Date.now() }
+          : doc));
+      } else {
+        const result = await generateImages(id, target.name, pages, target.pageCount, progressFor(id), target.publishedUris?.images);
+        if (result.warning) set({ exportWarning: { documentId: id, message: result.warning } });
+        await updateIndex((docs) => docs.map((doc) => doc.id === id
+          ? { ...doc, imageUris: result.uris, publishedUris: { ...doc.publishedUris, images: result.publishedUris }, updatedAt: Date.now() }
+          : doc));
+      }
     });
   };
 
   return {
-    docs: [],
-    loading: true,
-    exporting: false,
+    docs: [], loading: true, exporting: false, exportProgress: null, exportWarning: null,
 
     load: async () => {
       set({ loading: true });
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         const parsed: unknown = raw ? JSON.parse(raw) : [];
-        set({ docs: Array.isArray(parsed) ? parsed.filter(isScannedDoc) : [] });
-      } catch (e) {
-        console.error("Failed to load documents:", e);
+        const storedDocs = Array.isArray(parsed) ? parsed.filter(isScannedDoc) : [];
+        const docs = await migrateLegacyIosDocuments(storedDocs);
+        if (docs !== storedDocs) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
+        set({ docs });
+        cleanupOrphanedScans(new Set(docs.map((doc) => doc.id)), activeIds);
+      } catch (error) {
+        console.error("Failed to load documents:", error);
         set({ docs: [] });
       } finally {
         set({ loading: false });
@@ -106,113 +120,59 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => {
     createDocument: async ({ name, imageUris, exportMode }) => {
       const normalizedName = name.trim();
       if (!normalizedName) throw new Error("A document name is required.");
-      if (
-        !Array.isArray(imageUris) ||
-        imageUris.length === 0 ||
-        imageUris.some((uri) => typeof uri !== "string" || !uri.trim())
-      ) {
+      if (!Array.isArray(imageUris) || imageUris.length === 0 || imageUris.some((uri) => typeof uri !== "string" || !uri.trim())) {
         throw new Error("Cannot create a document with no pages.");
       }
-
+      if (exportMode !== "pdf" && exportMode !== "images") throw new Error("Choose PDF or image export.");
       const now = Date.now();
       const id = `${now}-${Math.random().toString(36).slice(2, 10)}`;
 
-      if (exportMode !== "pdf" && exportMode !== "images") {
-        throw new Error("Choose PDF or image export.");
-      }
-
-      return trackExport(async () => {
+      return trackExport(id, async () => {
+        cleanupOrphanedScans(new Set(get().docs.map((doc) => doc.id)), activeIds);
+        const sourceUris = await persistSourcePages(id, imageUris);
+        const doc: ScannedDoc = {
+          id, name: normalizedName, thumbUri: sourceUris[0], sourceUris,
+          pageCount: sourceUris.length, createdAt: now, updatedAt: now, publishedUris: {},
+        };
+        // Persist the source index before derived export work. A PDF or public
+        // copy failure must leave a recoverable document in Lens.
+        await updateIndex((docs) => [doc, ...docs]);
+        let warning: string | undefined;
         try {
-          const sourceUris = await persistSourcePages(id, imageUris);
-          const doc: ScannedDoc = {
-            id,
-            name: normalizedName,
-            thumbUri: sourceUris[0],
-            sourceUris,
-            pageCount: sourceUris.length,
-            createdAt: now,
-            updatedAt: now,
-          };
-
           if (exportMode === "pdf") {
-            doc.pdfUri = await generatePdf(id, normalizedName, sourceUris);
+            const result = await generatePdf(id, normalizedName, sourceUris, sourceUris.length, progressFor(id));
+            doc.pdfUri = result.uri;
+            if (result.publishedUri) doc.publishedUris = { pdf: result.publishedUri };
+            warning = result.warning;
           } else {
-            doc.imageUris = await generateImages(
-              id,
-              normalizedName,
-              sourceUris,
-            );
+            const result = await generateImages(id, normalizedName, sourceUris, sourceUris.length, progressFor(id));
+            doc.imageUris = result.uris;
+            doc.publishedUris = { images: result.publishedUris };
+            warning = result.warning;
           }
-
-          await updateIndex((docs) => [doc, ...docs]);
-          return doc;
         } catch (error) {
-          try {
-            deleteDocumentFiles(id);
-          } catch (cleanupError) {
-            console.error(
-              "Failed to clean up an incomplete document:",
-              cleanupError,
-            );
-          }
-          throw error;
+          warning = "The scan is saved in Lens, but its export could not be created.";
+          console.error("Scan saved, export failed:", error);
         }
+        await updateIndex((docs) => docs.map((current) => current.id === id ? doc : current));
+        return warning ? { ...doc, exportWarning: warning } : doc;
       });
     },
 
     reExportPdf: (id) => reExport(id, "pdf"),
-
     reExportImages: (id) => reExport(id, "images"),
 
     deleteDoc: async (id) => {
-      await updateIndex((docs) => docs.filter((d) => d.id !== id));
-      try {
-        deleteDocumentFiles(id);
-      } catch (error) {
-        // The record is already removed. A cleanup failure should not make the
-        // caller report that deletion failed when the document is gone.
-        console.error(
-          "Document was removed but its files could not be cleaned up:",
-          error,
-        );
-      }
+      await updateIndex((docs) => docs.filter((doc) => doc.id !== id));
+      while (activeIds.has(id)) await new Promise((resolve) => setTimeout(resolve, 25));
+      try { deleteDocumentFiles(id); }
+      catch (error) { console.error("Document was removed but its files could not be cleaned up:", error); }
     },
 
     renameDoc: async (id, name) => {
       const normalizedName = name.trim();
       if (!normalizedName) throw new Error("A document name is required.");
-      await updateIndex((docs) =>
-        docs.map((d) =>
-          d.id === id
-            ? { ...d, name: normalizedName, updatedAt: Date.now() }
-            : d,
-        ),
-      );
+      await updateIndex((docs) => docs.map((doc) => doc.id === id ? { ...doc, name: normalizedName, updatedAt: Date.now() } : doc));
     },
   };
 });
-
-function isScannedDoc(value: unknown): value is ScannedDoc {
-  if (!value || typeof value !== "object") return false;
-  const doc = value as Partial<ScannedDoc>;
-  return (
-    typeof doc.id === "string" &&
-    typeof doc.name === "string" &&
-    typeof doc.thumbUri === "string" &&
-    typeof doc.pageCount === "number" &&
-    Number.isFinite(doc.pageCount) &&
-    doc.pageCount > 0 &&
-    typeof doc.createdAt === "number" &&
-    Number.isFinite(doc.createdAt) &&
-    (doc.updatedAt === undefined ||
-      (typeof doc.updatedAt === "number" && Number.isFinite(doc.updatedAt))) &&
-    (doc.sourceUris === undefined ||
-      (Array.isArray(doc.sourceUris) &&
-        doc.sourceUris.length === doc.pageCount &&
-        doc.sourceUris.every((uri) => typeof uri === "string" && !!uri))) &&
-    (doc.imageUris === undefined ||
-      (Array.isArray(doc.imageUris) &&
-        doc.imageUris.every((uri) => typeof uri === "string" && !!uri))) &&
-    (doc.pdfUri === undefined || typeof doc.pdfUri === "string")
-  );
-}

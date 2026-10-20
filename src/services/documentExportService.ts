@@ -1,35 +1,33 @@
-import * as Print from "expo-print";
-import { Platform } from "react-native";
+import * as Sharing from "expo-sharing";
+import { PermissionsAndroid, Platform } from "react-native";
 import ReactNativeBlobUtil from "react-native-blob-util";
 import { Paths, Directory, File } from "expo-file-system";
-import { buildDocumentHtml } from "./documentHtml";
+import { safeFileName, uniqueFileName } from "./fileNames";
+import { PDF_PAGE_WIDTH_PT } from "./exportConfig";
 
-function safeFileName(name: string): string {
-  return (
-    name
-      .trim()
-      .replace(/[^a-zA-Z0-9._-]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "scan"
-  );
+export type ExportProgressCallback = (done: number, total: number) => void;
+export type PublishedUris = { pdf?: string; images?: string[] };
+export type GeneratedPdf = { uri: string; publishedUri?: string; warning?: string };
+export type GeneratedImages = { uris: string[]; publishedUris: string[]; warning?: string };
+
+function legacyScansDir(): Directory {
+  return new Directory(Paths.document, "scans");
 }
 
-// Android only: copies an already-persisted app-private file into the
-// public MediaStore (Downloads/Pictures) so it's visible outside the app,
-// without disturbing the private copy the app itself reads for preview.
-async function publishToMediaStore(
-  localFile: File,
-  displayName: string,
-  parentFolder: string,
-  mimeType: string,
-  collection: "Download" | "Image",
-): Promise<void> {
-  await ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
-    { name: displayName, parentFolder, mimeType },
-    collection,
-    localFile.uri.startsWith("file://")
-      ? localFile.uri.replace(/^file:\/\//, "")
-      : localFile.uri,
-  );
+function privateScansDir(): Directory {
+  if (Platform.OS === "ios") {
+    const library = ReactNativeBlobUtil.fs.dirs.LibraryDir;
+    return new Directory(library.startsWith("file://") ? library : `file://${library}`, "Lens", "scans");
+  }
+  return legacyScansDir();
+}
+
+function sourceDirFor(id: string): Directory {
+  return new Directory(privateScansDir(), id, "source");
+}
+
+function localPath(uri: string): string {
+  return uri.replace(/^file:\/\//, "");
 }
 
 function mimeTypeFor(file: File): string {
@@ -40,164 +38,328 @@ function mimeTypeFor(file: File): string {
   return "image/jpeg";
 }
 
-async function toDataUri(uri: string): Promise<string> {
-  const file = new File(uri);
-  return `data:${mimeTypeFor(file)};base64,${await file.base64()}`;
+function jpegDimensions(bytes: Uint8Array): { width: number; height: number; components: number } {
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    throw new Error("PDF export currently requires JPEG scan pages.");
+  }
+  let offset = 2;
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+    const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+      return {
+        height: (bytes[offset + 5] << 8) | bytes[offset + 6],
+        width: (bytes[offset + 7] << 8) | bytes[offset + 8],
+        components: bytes[offset + 9],
+      };
+    }
+    if (length < 2) break;
+    offset += length + 2;
+  }
+  throw new Error("Could not read the dimensions of a scanned page.");
 }
 
-function scansDirFor(): Directory {
-  return new Directory(Paths.document, "scans");
+async function copyFile(source: File, destination: File): Promise<void> {
+  destination.parentDirectory.create({ intermediates: true, idempotent: true });
+  if (destination.exists) destination.delete();
+  await source.copy(destination);
 }
 
-function sourceDirFor(id: string): Directory {
-  return new Directory(scansDirFor(), id, "source");
-}
-
-// The scanned page images for a document are persisted exactly once, the
-// first time ANY export (PDF or Images) happens for that id, and are kept
-// permanently from then on. Both formats are just different outputs
-// derived from this one source, which is what makes it possible to add
-// the missing format to an already-saved doc later without rescanning.
-/** Persist scanned pages so thumbnails and exports survive scanner cache cleanup. */
+/** Copies a page set into durable private storage, one page at a time. */
 export async function persistSourcePages(
   id: string,
   pages?: string[],
   expectedPageCount = pages?.length,
 ): Promise<string[]> {
   const sourceDir = sourceDirFor(id);
-
   if (sourceDir.exists) {
     const existing = sourceDir
       .list()
       .filter((entry): entry is File => entry instanceof File)
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true }),
-      );
-    if (
-      existing.length > 0 &&
-      (expectedPageCount === undefined || existing.length === expectedPageCount)
-    ) {
-      return existing.map((f) => f.uri);
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    if (existing.length > 0 && (expectedPageCount === undefined || existing.length === expectedPageCount)) {
+      return existing.map((file) => file.uri);
     }
-    // A previous interrupted save may have left only part of the source set.
-    // Never treat that partial set as a complete document.
-    if (pages && existing.length > 0) {
-      const pagesAreStoredSources = pages.every((uri) =>
-        uri.startsWith(sourceDir.uri),
-      );
-      if (pagesAreStoredSources) {
-        throw new Error(
-          "Some saved scan pages are missing. Please rescan this document.",
-        );
-      }
-      sourceDir.delete();
+    if (pages && existing.length > 0 && pages.every((uri) => uri.startsWith(sourceDir.uri))) {
+      throw new Error("Some saved scan pages are missing. Please rescan this document.");
     }
+    sourceDir.delete();
   }
 
-  if (!pages || pages.length === 0) {
-    throw new Error(
-      "The original scanned pages for this document are no longer available. Please rescan.",
-    );
+  if (!pages?.length) {
+    throw new Error("The original scanned pages for this document are no longer available. Please rescan.");
   }
 
-  scansDirFor().create({ intermediates: true, idempotent: true });
   sourceDir.create({ intermediates: true, idempotent: true });
-
   const persisted: string[] = [];
-  for (let i = 0; i < pages.length; i++) {
-    const src = new File(pages[i]);
-    const ext = (src.extension || ".jpg").replace(/^\./, "") || "jpg";
-    const dest = new File(
-      sourceDir,
-      `page-${String(i + 1).padStart(3, "0")}.${ext}`,
-    );
-    try {
-      await src.copy(dest);
-    } catch {
-      try {
-        await dest.write(await src.bytes());
-      } catch {
-        throw new Error(
-          "A scanned page is no longer available. Please rescan.",
-        );
-      }
-    }
-    persisted.push(dest.uri);
+  for (let i = 0; i < pages.length; i += 1) {
+    const source = new File(pages[i]);
+    const extension = (source.extension || ".jpg").replace(/^\./, "") || "jpg";
+    const destination = new File(sourceDir, `page-${String(i + 1).padStart(3, "0")}.${extension}`);
+    await copyFile(source, destination);
+    persisted.push(destination.uri);
   }
   return persisted;
 }
 
-/** Remove the app-private source pages and generated PDF for a document. */
-export function deleteDocumentFiles(id: string): void {
-  const sourceDir = sourceDirFor(id);
-  if (sourceDir.exists) sourceDir.delete();
-  const pdfFile = new File(scansDirFor(), `${id}.pdf`);
-  if (pdfFile.exists) pdfFile.delete();
+async function appendText(path: string, value: string): Promise<void> {
+  await ReactNativeBlobUtil.fs.appendFile(path, value, "utf8");
 }
 
-// pages is optional: pass freshly scanned page URIs on first export for a
-// document, or omit it to (re)generate from an already-persisted source.
+async function offset(path: string): Promise<number> {
+  return Number((await ReactNativeBlobUtil.fs.stat(path)).size);
+}
+
+async function createPdf(sourceUris: string[], destination: File, onProgress?: ExportProgressCallback): Promise<void> {
+  destination.parentDirectory.create({ intermediates: true, idempotent: true });
+  if (destination.exists) destination.delete();
+  destination.create({ intermediates: true, overwrite: true });
+  const path = localPath(destination.uri);
+  const count = sourceUris.length;
+  const offsets: number[] = [0];
+  const pagesObject = 2;
+  const pageObject = (index: number) => 3 + index * 3;
+  const imageObject = (index: number) => 4 + index * 3;
+  const contentObject = (index: number) => 5 + index * 3;
+
+  let text = "%PDF-1.4\n%Lens\n";
+  offsets[1] = text.length;
+  text += "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+  offsets[pagesObject] = text.length;
+  text += `2 0 obj\n<< /Type /Pages /Count ${count} /Kids [${sourceUris.map((_, i) => `${pageObject(i)} 0 R`).join(" ")}] >>\nendobj\n`;
+  await ReactNativeBlobUtil.fs.writeFile(path, text, "utf8");
+
+  for (let index = 0; index < sourceUris.length; index += 1) {
+    const source = new File(sourceUris[index]);
+    const dimensions = jpegDimensions(new Uint8Array(await source.bytes()));
+    const width = PDF_PAGE_WIDTH_PT;
+    const height = (width * dimensions.height) / dimensions.width;
+    const page = pageObject(index);
+    const image = imageObject(index);
+    const content = contentObject(index);
+    let objects = "";
+    offsets[page] = (await offset(path)) + objects.length;
+    objects += `${page} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width.toFixed(3)} ${height.toFixed(3)}] /Resources << /XObject << /Im${index + 1} ${image} 0 R >> >> /Contents ${content} 0 R >>\nendobj\n`;
+    offsets[image] = (await offset(path)) + objects.length;
+    const imageSize = Number((await ReactNativeBlobUtil.fs.stat(localPath(source.uri))).size);
+    const colorSpace = dimensions.components === 1 ? "/DeviceGray" : dimensions.components === 4 ? "/DeviceCMYK" : "/DeviceRGB";
+    objects += `${image} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${dimensions.width} /Height ${dimensions.height} /ColorSpace ${colorSpace} /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageSize} >>\nstream\n`;
+    await appendText(path, objects);
+    await ReactNativeBlobUtil.fs.appendFile(path, localPath(source.uri), "uri");
+    const streamTail = `\nendstream\nendobj\n`;
+    await appendText(path, streamTail);
+    offsets[content] = await offset(path);
+    const contentStream = `q\n${width.toFixed(3)} 0 0 ${height.toFixed(3)} 0 0 cm\n/Im${index + 1} Do\nQ\n`;
+    await appendText(path, `${content} 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`);
+    onProgress?.(index + 1, count);
+  }
+
+  const xrefOffset = await offset(path);
+  const lastObject = 2 + count * 3;
+  let xref = `xref\n0 ${lastObject + 1}\n0000000000 65535 f \n`;
+  for (let object = 1; object <= lastObject; object += 1) {
+    xref += `${String(offsets[object]).padStart(10, "0")} 00000 n \n`;
+  }
+  xref += `trailer\n<< /Size ${lastObject + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  await appendText(path, xref);
+}
+
+async function getExistingNames(directory: Directory): Promise<string[]> {
+  if (!directory.exists) return [];
+  return directory.list().filter((entry): entry is File => entry instanceof File).map((file) => file.name.replace(/\.[^.]+$/, ""));
+}
+
+async function publishAndroid(file: File, displayName: string, collection: "Download" | "Image"): Promise<string> {
+  if (Number(Platform.Version) <= 28) {
+    const permission = PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
+    const granted = await PermissionsAndroid.request(permission, {
+      title: "Allow Lens to save exports",
+      message: "Lens needs storage access to place exported files in Downloads/Lens or Pictures/Lens.",
+      buttonPositive: "Allow",
+      buttonNegative: "Cancel",
+    });
+    if (granted !== PermissionsAndroid.RESULTS.GRANTED) throw new Error("Storage permission was not granted.");
+    const sharedRoot = collection === "Download"
+      ? ReactNativeBlobUtil.fs.dirs.LegacyDownloadDir
+      : ReactNativeBlobUtil.fs.dirs.LegacyPictureDir;
+    const directory = `${sharedRoot}/Lens`;
+    await ReactNativeBlobUtil.fs.mkdir(directory);
+    const names = await ReactNativeBlobUtil.fs.ls(directory);
+    const uniqueName = uniqueFileName(displayName.replace(/\.[^.]+$/, ""), names.map((name) => name.replace(/\.[^.]+$/, "")));
+    const extension = displayName.match(/\.[^.]+$/)?.[0] ?? "";
+    const destination = `${directory}/${uniqueName}${extension}`;
+    await ReactNativeBlobUtil.fs.cp(localPath(file.uri), destination);
+    return `file://${destination}`;
+  }
+  const uniqueName = displayName.replace(/\.[^.]+$/, "");
+  const extension = displayName.match(/\.[^.]+$/)?.[0] ?? "";
+  const result = await ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
+    { name: `${uniqueName}${extension}`, parentFolder: "Lens", mimeType: collection === "Download" ? "application/pdf" : mimeTypeFor(file) },
+    collection,
+    localPath(file.uri),
+  );
+  return typeof result === "string" ? result : String(result);
+}
+
+async function publishIos(file: File, displayName: string): Promise<string> {
+  const directory = new Directory(Paths.document, "Lens");
+  directory.create({ intermediates: true, idempotent: true });
+  const uniqueName = uniqueFileName(displayName.replace(/\.[^.]+$/, ""), await getExistingNames(directory));
+  const extension = displayName.match(/\.[^.]+$/)?.[0] ?? "";
+  const destination = new File(directory, `${uniqueName}${extension}`);
+  await copyFile(file, destination);
+  return destination.uri;
+}
+
 export async function generatePdf(
   id: string,
   docName: string,
   pages?: string[],
   expectedPageCount?: number,
-): Promise<string> {
+  onProgress?: ExportProgressCallback,
+): Promise<GeneratedPdf> {
   const sourceUris = await persistSourcePages(id, pages, expectedPageCount);
-  const html = buildDocumentHtml(
-    await Promise.all(sourceUris.map(toDataUri)),
-    docName,
-  );
-  const { uri: tmpUri } = await Print.printToFileAsync({ html });
-
-  const scansDir = scansDirFor();
-  scansDir.create({ intermediates: true, idempotent: true });
-
-  const destFile = new File(scansDir, `${id}.pdf`);
-  if (destFile.exists) destFile.delete();
-  await new File(tmpUri).move(destFile);
-
-  // The app keeps reading destFile (private) for in-app preview. This just
-  // additionally makes the same content visible to the user outside the
-  // app. iOS already gets equivalent visibility via Files-app entitlements
-  // on Paths.document (see app.json), so no extra step is needed there.
-  if (Platform.OS === "android") {
-    await publishToMediaStore(
-      destFile,
-      `${safeFileName(docName)}.pdf`,
-      "Lens",
-      "application/pdf",
-      "Download",
-    );
-  }
-
-  return destFile.uri;
+  const destination = new File(privateScansDir(), `${id}.pdf`);
+  await createPdf(sourceUris, destination, onProgress);
+  return { uri: destination.uri, ...(await publishPdf(id, docName, destination.uri)) };
 }
 
-// Images ARE the persisted source pages — nothing extra to generate, just
-// ensure the source exists and hand back its file URIs.
+export async function publishPdf(id: string, docName: string, uri: string): Promise<{ publishedUri?: string; warning?: string }> {
+  const file = new File(uri);
+  try {
+    const publishedUri = Platform.OS === "android"
+      ? await publishAndroid(file, `${safeFileName(docName)}-${id}.pdf`, "Download")
+      : Platform.OS === "ios"
+        ? await publishIos(file, `${safeFileName(docName)}.pdf`)
+        : undefined;
+    return { publishedUri };
+  } catch (error) {
+    console.warn("PDF is saved in Lens, but could not be copied to shared storage:", error);
+    return { warning: "Saved in Lens, but couldn't copy the PDF to shared storage." };
+  }
+}
+
 export async function generateImages(
   id: string,
   docName: string,
   pages?: string[],
   expectedPageCount?: number,
-): Promise<string[]> {
+  onProgress?: ExportProgressCallback,
+  alreadyPublished: string[] = [],
+): Promise<GeneratedImages> {
   const uris = await persistSourcePages(id, pages, expectedPageCount);
-
-  if (Platform.OS === "android") {
-    await Promise.all(
-      uris.map((uri, index) => {
-        const file = new File(uri);
-        return publishToMediaStore(
-          file,
-          `${safeFileName(docName)}-page-${index + 1}${file.extension || ".jpg"}`,
-          "Lens",
-          mimeTypeFor(file),
-          "Image",
-        );
-      }),
-    );
+  const publishedUris: string[] = [];
+  let warning: string | undefined;
+  for (let index = 0; index < uris.length; index += 1) {
+    const file = new File(uris[index]);
+    if (alreadyPublished[index]) {
+      publishedUris[index] = alreadyPublished[index];
+      onProgress?.(index + 1, uris.length);
+      continue;
+    }
+    if (Platform.OS === "android" || Platform.OS === "ios") {
+      try {
+        const baseName = `${safeFileName(docName)}-page-${String(index + 1).padStart(3, "0")}`;
+        const displayName = `${Platform.OS === "android" ? `${baseName}-${id}` : baseName}${file.extension || ".jpg"}`;
+        publishedUris[index] = Platform.OS === "android"
+          ? await publishAndroid(file, displayName, "Image")
+          : await publishIos(file, displayName);
+      } catch (error) {
+        warning = "Saved in Lens, but couldn't copy all images to shared storage.";
+        console.warn(`Could not publish image ${index + 1}:`, error);
+      }
+    }
+    onProgress?.(index + 1, uris.length);
   }
+  return { uris, publishedUris, warning };
+}
 
-  return uris;
+export async function shareImage(uri: string): Promise<void> {
+  if (!(await Sharing.isAvailableAsync())) throw new Error("Sharing is unavailable on this device.");
+  await Sharing.shareAsync(uri, { mimeType: "image/jpeg", UTI: "public.jpeg" });
+}
+
+export function deleteDocumentFiles(id: string): void {
+  const sourceDir = sourceDirFor(id);
+  if (sourceDir.exists) sourceDir.delete();
+  const pdfFile = new File(privateScansDir(), `${id}.pdf`);
+  if (pdfFile.exists) pdfFile.delete();
+  if (Platform.OS === "ios") {
+    const legacySource = new Directory(legacyScansDir(), id);
+    const legacyPdf = new File(legacyScansDir(), `${id}.pdf`);
+    if (legacySource.exists) legacySource.delete();
+    if (legacyPdf.exists) legacyPdf.delete();
+  }
+}
+
+export function cleanupOrphanedScans(knownIds: Set<string>, activeIds: Set<string> = new Set()): void {
+  const directories = Platform.OS === "ios" ? [privateScansDir(), legacyScansDir()] : [privateScansDir()];
+  for (const directory of directories) {
+    if (!directory.exists) continue;
+    for (const entry of directory.list()) {
+      if (entry instanceof Directory && !knownIds.has(entry.name) && !activeIds.has(entry.name)) entry.delete();
+      if (entry instanceof File && entry.extension.toLowerCase() === ".pdf" && !knownIds.has(entry.name.replace(/\.pdf$/i, ""))) entry.delete();
+    }
+  }
+}
+
+/** Move existing iOS documents out of the Files-visible legacy scans folder. */
+export async function migrateLegacyIosDocuments<T extends {
+  id: string; name: string; pageCount: number; thumbUri: string;
+  sourceUris?: string[]; imageUris?: string[]; pdfUri?: string;
+}>(documents: T[]): Promise<T[]> {
+  if (Platform.OS !== "ios") return documents;
+  let changed = false;
+  const migrated: T[] = [];
+  const legacyRoot = legacyScansDir();
+  const exportsDir = new Directory(Paths.document, "Lens");
+
+  for (const document of documents) {
+    const legacySource = new Directory(legacyRoot, document.id, "source");
+    const legacyPdf = new File(legacyRoot, `${document.id}.pdf`);
+    if (!legacySource.exists && !legacyPdf.exists) {
+      migrated.push(document);
+      continue;
+    }
+
+    let next = { ...document };
+    if (legacySource.exists) {
+      const oldPages = legacySource.list().filter((entry): entry is File => entry instanceof File)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      if (oldPages.length === document.pageCount) {
+        const sourceUris = await persistSourcePages(document.id, oldPages.map((file) => file.uri), document.pageCount);
+        next = { ...next, sourceUris, thumbUri: sourceUris[0] };
+        if (document.imageUris) {
+          exportsDir.create({ intermediates: true, idempotent: true });
+          const imageUris: string[] = [];
+          for (let index = 0; index < sourceUris.length; index += 1) {
+            const source = new File(sourceUris[index]);
+            const filename = `${safeFileName(document.name)}-page-${String(index + 1).padStart(3, "0")}${source.extension || ".jpg"}`;
+            const target = new File(exportsDir, uniqueFileName(filename.replace(/\.[^.]+$/, ""), await getExistingNames(exportsDir)) + (source.extension || ".jpg"));
+            await copyFile(source, target);
+            imageUris.push(target.uri);
+          }
+          next.imageUris = imageUris;
+        }
+      }
+    }
+
+    if (legacyPdf.exists) {
+      exportsDir.create({ intermediates: true, idempotent: true });
+      const filename = `${safeFileName(document.name)}.pdf`;
+      const target = new File(exportsDir, `${uniqueFileName(filename.replace(/\.pdf$/i, ""), await getExistingNames(exportsDir))}.pdf`);
+      await copyFile(legacyPdf, target);
+      next.pdfUri = target.uri;
+      legacyPdf.delete();
+    }
+    if (legacySource.exists && next.sourceUris) legacySource.delete();
+    changed = true;
+    migrated.push(next);
+  }
+  if (legacyRoot.exists && legacyRoot.list().length === 0) legacyRoot.delete();
+  return changed ? migrated : documents;
 }
