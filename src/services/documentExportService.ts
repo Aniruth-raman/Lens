@@ -8,6 +8,8 @@ import {
   PDF_JPEG_QUALITY,
   PDF_MAX_IMAGE_EDGE,
   PDF_PAGE_WIDTH_PT,
+  THUMBNAIL_JPEG_QUALITY,
+  THUMBNAIL_MAX_EDGE,
 } from "./exportConfig";
 
 export type ExportProgressCallback = (done: number, total: number) => void;
@@ -29,6 +31,10 @@ function privateScansDir(): Directory {
 
 function sourceDirFor(id: string): Directory {
   return new Directory(privateScansDir(), id, "source");
+}
+
+function thumbnailFileFor(id: string): File {
+  return new File(new Directory(privateScansDir(), id), "thumbnail.jpg");
 }
 
 function localPath(uri: string): string {
@@ -108,15 +114,15 @@ async function offset(path: string): Promise<number> {
   return Number((await ReactNativeBlobUtil.fs.stat(path)).size);
 }
 
-async function preparePdfJpeg(source: File): Promise<{ file: File; width: number; height: number }> {
-  const context = ImageManipulator.manipulate(source.uri);
+async function prepareJpeg(sourceUri: string, maxEdge: number, quality: number): Promise<{ file: File; width: number; height: number }> {
+  const context = ImageManipulator.manipulate(sourceUri);
   let image: Awaited<ReturnType<typeof context.renderAsync>> | undefined;
   try {
     image = await context.renderAsync();
     const longEdge = Math.max(image.width, image.height);
-    if (longEdge > PDF_MAX_IMAGE_EDGE) {
-      const resizedWidth = image.width >= image.height ? PDF_MAX_IMAGE_EDGE : null;
-      const resizedHeight = image.height > image.width ? PDF_MAX_IMAGE_EDGE : null;
+    if (longEdge > maxEdge) {
+      const resizedWidth = image.width >= image.height ? maxEdge : null;
+      const resizedHeight = image.height > image.width ? maxEdge : null;
       image.release();
       image = undefined;
       context.reset().resize({ width: resizedWidth, height: resizedHeight });
@@ -125,13 +131,34 @@ async function preparePdfJpeg(source: File): Promise<{ file: File; width: number
 
     const result = await image.saveAsync({
       format: SaveFormat.JPEG,
-      compress: PDF_JPEG_QUALITY,
+      compress: quality,
     });
     return { file: new File(result.uri), width: result.width, height: result.height };
   } finally {
     image?.release();
     context.release();
   }
+}
+
+async function preparePdfJpeg(source: File): Promise<{ file: File; width: number; height: number }> {
+  return prepareJpeg(source.uri, PDF_MAX_IMAGE_EDGE, PDF_JPEG_QUALITY);
+}
+
+/** Creates and stores a JPEG thumbnail while leaving the source page untouched. */
+export async function generateThumbnail(id: string, sourceUri: string): Promise<string> {
+  const prepared = await prepareJpeg(sourceUri, THUMBNAIL_MAX_EDGE, THUMBNAIL_JPEG_QUALITY);
+  const destination = thumbnailFileFor(id);
+  try {
+    await copyFile(prepared.file, destination);
+    return destination.uri;
+  } finally {
+    if (prepared.file.exists) prepared.file.delete();
+  }
+}
+
+export function hasGeneratedThumbnail(id: string, uri: string): boolean {
+  const thumbnail = thumbnailFileFor(id);
+  return uri === thumbnail.uri && thumbnail.exists;
 }
 
 async function createPdf(sourceUris: string[], destination: File, onProgress?: ExportProgressCallback): Promise<void> {
@@ -310,8 +337,8 @@ export async function shareImage(uri: string): Promise<void> {
 }
 
 export function deleteDocumentFiles(id: string): void {
-  const sourceDir = sourceDirFor(id);
-  if (sourceDir.exists) sourceDir.delete();
+  const documentDir = new Directory(privateScansDir(), id);
+  if (documentDir.exists) documentDir.delete();
   const pdfFile = new File(privateScansDir(), `${id}.pdf`);
   if (pdfFile.exists) pdfFile.delete();
   if (Platform.OS === "ios") {

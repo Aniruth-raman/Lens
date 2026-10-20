@@ -10,6 +10,8 @@ import {
   publishPdf,
   persistSourcePages,
   migrateLegacyIosDocuments,
+  generateThumbnail,
+  hasGeneratedThumbnail,
 } from "../services/documentExportService";
 import { isScannedDoc } from "./validation";
 
@@ -36,6 +38,25 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => {
   const activeIdCounts = new Map<string, number>();
   const activeIds = new Set<string>();
 
+  const beginDocumentWork = (id: string) => {
+    activeIdCounts.set(id, (activeIdCounts.get(id) ?? 0) + 1);
+    activeIds.add(id);
+  };
+
+  const endDocumentWork = (id: string) => {
+    const remaining = (activeIdCounts.get(id) ?? 1) - 1;
+    if (remaining === 0) {
+      activeIdCounts.delete(id);
+      activeIds.delete(id);
+    } else activeIdCounts.set(id, remaining);
+  };
+
+  const trackDocumentWork = async <T>(id: string, operation: () => Promise<T>): Promise<T> => {
+    beginDocumentWork(id);
+    try { return await operation(); }
+    finally { endDocumentWork(id); }
+  };
+
   const updateIndex = (update: (docs: ScannedDoc[]) => ScannedDoc[]) => {
     const write = indexWriteQueue.then(async () => {
       const docs = update(get().docs);
@@ -51,20 +72,37 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => {
 
   const trackExport = async <T>(id: string, operation: () => Promise<T>) => {
     activeExports += 1;
-    activeIdCounts.set(id, (activeIdCounts.get(id) ?? 0) + 1);
-    activeIds.add(id);
+    beginDocumentWork(id);
     set({ exporting: true, exportProgress: { documentId: id, done: 0, total: 0 }, exportWarning: null });
     try {
       return await operation();
     } finally {
       activeExports -= 1;
-      const remaining = (activeIdCounts.get(id) ?? 1) - 1;
-      if (remaining === 0) {
-        activeIdCounts.delete(id);
-        activeIds.delete(id);
-      } else activeIdCounts.set(id, remaining);
+      endDocumentWork(id);
       set({ exporting: activeExports > 0, exportProgress: null });
     }
+  };
+
+  const generateMissingThumbnails = (documents: ScannedDoc[]) => {
+    void (async () => {
+      for (const document of documents) {
+        if (hasGeneratedThumbnail(document.id, document.thumbUri)) continue;
+        const sourceUri = document.sourceUris?.[0] ?? document.imageUris?.[0] ?? document.thumbUri;
+        if (!sourceUri) continue;
+        try {
+          await trackDocumentWork(document.id, async () => {
+            const current = get().docs.find((item) => item.id === document.id);
+            if (!current || current.thumbUri !== document.thumbUri || hasGeneratedThumbnail(current.id, current.thumbUri)) return;
+            const thumbUri = await generateThumbnail(current.id, sourceUri);
+            await updateIndex((docs) => docs.map((item) => item.id === current.id && item.thumbUri === document.thumbUri
+              ? { ...item, thumbUri, updatedAt: Date.now() }
+              : item));
+          });
+        } catch (error) {
+          console.warn(`Could not generate a thumbnail for ${document.id}:`, error);
+        }
+      }
+    })();
   };
 
   const reExport = async (id: string, mode: ExportMode) => {
@@ -111,6 +149,7 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => {
         set({ docs });
         cleanupLegacyIosDocuments(docs);
         cleanupOrphanedScans(new Set(docs.map((doc) => doc.id)), activeIds);
+        generateMissingThumbnails(docs);
       } catch (error) {
         console.error("Failed to load documents:", error);
         set({ docs: [] });
@@ -139,6 +178,12 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => {
         // Persist the source index before derived export work. A PDF or public
         // copy failure must leave a recoverable document in Lens.
         await updateIndex((docs) => [doc, ...docs]);
+        try {
+          doc.thumbUri = await generateThumbnail(id, sourceUris[0]);
+          await updateIndex((docs) => docs.map((current) => current.id === id ? { ...current, thumbUri: doc.thumbUri } : current));
+        } catch (error) {
+          console.warn(`Could not generate a thumbnail for ${id}:`, error);
+        }
         let warning: string | undefined;
         try {
           if (exportMode === "pdf") {
