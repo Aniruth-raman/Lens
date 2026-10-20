@@ -41,11 +41,11 @@ export function DocumentActionsSheet({ visible, documentName, onRename, onDelete
 }
 
 const styles = StyleSheet.create({
-  sheet: { paddingTop: 8, paddingHorizontal: 20, paddingBottom: 12, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors["surface-raised"] },
+  sheet: { width: "100%", paddingTop: 8, paddingHorizontal: 20, paddingBottom: 12 },
   handleArea: { minHeight: 32, alignItems: "center", justifyContent: "center" },
   handle: { width: 36, height: 4, borderRadius: 4, backgroundColor: colors["text-muted"] },
   name: { color: colors.text, fontSize: 16, fontWeight: "600", marginTop: 8, marginBottom: 12 },
-  row: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 12, borderRadius: 12 },
+  row: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 12, borderRadius: 12 },
   rowText: { color: colors.text, fontSize: 16, fontWeight: "500" },
   deleteRow: { marginBottom: 4 },
   deleteText: { color: colors.destructive, fontSize: 16, fontWeight: "600" },

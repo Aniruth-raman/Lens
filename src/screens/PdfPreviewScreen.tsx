@@ -152,6 +152,7 @@ export default function PdfPreviewScreen() {
         {both && <View className="flex-row rounded-full border border-outline p-1 mb-2">
           {(["pdf", "images"] as const).map((item) => <TouchableOpacity key={item} accessibilityRole="button" accessibilityLabel={item === "pdf" ? "PDF" : "Images"} accessibilityState={{ selected: format === item, disabled: !!saving }} disabled={!!saving} onPress={() => setFormat(item)} className={`min-h-[44px] flex-1 flex-row items-center justify-center rounded-full ${format === item ? "bg-surface-high" : ""}`}><Ionicons name={item === "pdf" ? "document-text-outline" : "images-outline"} size={18} color={colors.text} style={{ marginRight: 8 }} /><Text className="text-text text-sm">{item === "pdf" ? "PDF" : "Images"}</Text></TouchableOpacity>)}
         </View>}
+        <View style={{ gap: 10 }}>
         {saving ? (
           <Button icon={saving === "pdf" ? "document-text-outline" : "images-outline"} onPress={() => undefined} loading disabled>{saving === "pdf" ? "Saving PDF…" : "Saving images…"}</Button>
         ) : sharing ? (
@@ -159,25 +160,26 @@ export default function PdfPreviewScreen() {
         ) : pdfError && showPdf ? (
           <>
             <Button icon="refresh-outline" onPress={() => { setPdfError(false); setPdfLoading(true); }}>Try again</Button>
-            {hasPdf && <Button variant="secondary" icon="share-outline" onPress={() => void sharePdf()} style={{ marginTop: 8 }}>Share PDF</Button>}
-            {hasPdf && !hasImages && <Button variant="secondary" icon="images-outline" onPress={() => void saveFormat("images")} style={{ marginTop: 8 }}>Save as images</Button>}
+            {hasPdf && <Button variant="secondary" icon="share-outline" onPress={() => void sharePdf()}>Share PDF</Button>}
+            {hasPdf && !hasImages && <Button variant="secondary" icon="images-outline" onPress={() => void saveFormat("images")}>Save as images</Button>}
           </>
         ) : showPdf && pdfLoading ? (
           <Button icon="document-text-outline" onPress={() => undefined} loading disabled>Loading PDF…</Button>
         ) : hasImages && !showPdf ? (
           <>
-            <Button icon="share-outline" onPress={() => void sharePage(doc.imageUris![page - 1] ?? doc.imageUris![0])} disabled={!currentImageReady} style={{ marginBottom: 8 }}>Share page {page}</Button>
+            <Button icon="share-outline" onPress={() => void sharePage(doc.imageUris![page - 1] ?? doc.imageUris![0])} disabled={!currentImageReady}>Share page {page}</Button>
             {!hasPdf && <Button variant="secondary" icon="document-text-outline" onPress={() => void saveFormat("pdf")} disabled={!currentImageReady}>Save as PDF</Button>}
           </>
         ) : hasPdf ? (
           <>
-            <Button icon="share-outline" onPress={() => void sharePdf()} style={{ marginBottom: 8 }}>Share PDF</Button>
+            <Button icon="share-outline" onPress={() => void sharePdf()}>Share PDF</Button>
             {!hasImages && <Button variant="secondary" icon="images-outline" onPress={() => void saveFormat("images")}>Save as images</Button>}
           </>
         ) : <Button icon="document-text-outline" onPress={() => void saveFormat("pdf")}>Save as PDF</Button>}
+        </View>
       </View>
       <ConfirmDialog visible={deleteDialog} title="Delete document?" message={`This removes “${doc.name}” from Lens. Copies already saved to Downloads or Pictures will remain there.`} confirmLabel="Delete from Lens" onConfirm={() => void confirmDelete()} onCancel={() => setDeleteDialog(false)} destructive loading={deleting} />
-      <ConfirmDialog visible={!!feedback} title={feedback?.title ?? ""} message={feedback?.message ?? ""} confirmLabel={feedback?.title === "Saved in Lens" ? "Continue" : "Try again"} confirmIcon={feedback?.title === "Saved in Lens" ? "checkmark-outline" : "refresh-outline"} onConfirm={() => { const action = feedback?.action; setFeedback(null); action?.(); }} cancelLabel="" />
+      <ConfirmDialog visible={!!feedback} title={feedback?.title ?? ""} message={feedback?.message ?? ""} confirmLabel={feedback?.title === "Saved in Lens" ? "Continue" : "Try again"} onConfirm={() => { const action = feedback?.action; setFeedback(null); action?.(); }} cancelLabel="" />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,6 @@
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { colors } from "../theme/colors";
 
 type Props = {
   children: React.ReactNode;
@@ -14,16 +15,34 @@ export function ModalSafeArea({ children, align = "center", scrimColor, onDismis
     <SafeAreaProvider>
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={[styles.overlay, { backgroundColor: scrimColor }]}>
-          {onDismiss && <Pressable accessibilityRole="button" accessibilityLabel={dismissLabel} style={StyleSheet.absoluteFill} onPress={onDismiss} />}
-          <SafeAreaView edges={["top", "right", "bottom", "left"]} style={styles.safeArea}>
-            <ScrollView
-              bounces={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={[styles.content, align === "bottom" ? styles.bottom : styles.center]}
-            >
-              {children}
-            </ScrollView>
-          </SafeAreaView>
+          {onDismiss && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={dismissLabel}
+              style={StyleSheet.absoluteFill}
+              onPress={onDismiss}
+            />
+          )}
+          <View pointerEvents="box-none" style={styles.fill}>
+            {align === "bottom" ? (
+              <View pointerEvents="box-none" style={styles.bottomLayer}>
+                <SafeAreaView edges={["bottom"]} style={styles.sheetSafeArea}>
+                  {children}
+                </SafeAreaView>
+              </View>
+            ) : (
+              <SafeAreaView pointerEvents="box-none" edges={["top", "right", "bottom", "left"]} style={styles.safeArea}>
+                <ScrollView
+                  bounces={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={[styles.content, styles.center]}
+                >
+                  {onDismiss && <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />}
+                  {children}
+                </ScrollView>
+              </SafeAreaView>
+            )}
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaProvider>
@@ -34,7 +53,16 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   overlay: { flex: 1 },
   safeArea: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: 24 },
-  center: { justifyContent: "center" },
-  bottom: { justifyContent: "flex-end" },
+  sheetSafeArea: {
+    width: "100%",
+    backgroundColor: colors["surface-raised"],
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderColor: colors.outline,
+    overflow: "hidden",
+  },
+  content: { flexGrow: 1 },
+  center: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 },
+  bottomLayer: { flex: 1, justifyContent: "flex-end" },
 });
