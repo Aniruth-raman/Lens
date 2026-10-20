@@ -2,6 +2,16 @@
 
 Use these strings verbatim unless a platform requires a shorter accessibility label. Use **Save** for creating a format, **Share** for sending it to another app, **Rename** for changing a document name, and **Delete** for removing a document from Lens. Avoid “Export” and generic success messages.
 
+## Button icon mapping
+
+| Action | Ionicons name |
+| --- | --- |
+| Save as PDF | `document-text-outline` |
+| Save as images | `images-outline` |
+| Share PDF or page | `share-outline` |
+| Retry an error | `refresh-outline` |
+| Delete | `trash-outline` (destructive colour) |
+
 ## Gallery
 
 | Context | String |
@@ -42,6 +52,7 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Delete error title | Couldn’t delete document |
 | Delete error fallback | Try again. |
 | Delete progress | Deleting document… |
+| Document options sheet title | Document options |
 
 ## Review
 
@@ -60,6 +71,10 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Empty review action | Back to Gallery |
 | Save as PDF action | Save as PDF |
 | Save as images action | Save as images |
+| PDF save caption (Android) | One PDF file · Saved to Downloads/Lens |
+| PDF save caption (iOS) | One PDF file · Available in Files |
+| Images save caption (Android) | One image per page · Saved to Pictures/Lens |
+| Images save caption (iOS) | One image per page · Available in Files |
 | Preparing PDF | Preparing PDF… |
 | Saving PDF | Saving PDF… |
 | Preparing images | Preparing images… |
@@ -92,6 +107,8 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Save images action | Save as images |
 | Share PDF action | Share PDF |
 | Share page action | Share page {number} |
+| Page-card share icon (accessibility) | Share page {number} |
+| Current-page share action | Share page {number} |
 | PDF loading | Loading PDF… |
 | Image loading | Loading page… |
 | PDF progress | Page {current} of {total} |
@@ -126,11 +143,16 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Public images warning title | Saved in Lens |
 | Public images warning | The images are saved in Lens, but couldn’t be copied to Pictures. You can try again here. |
 | Warning dismissal | OK |
+| Preview error retry action | Try again |
+| Primary action while sharing | Opening share sheet… |
+| Primary action while saving PDF | Saving PDF… |
+| Primary action while saving images | Saving images… |
 
 ## Screen-reader labels and announcements
 
 - Document card: **{name}, {count} pages, scanned {date}**.
 - Page removal: **Remove page {number}**.
+- Page-card share icon: **Share page {number}**. The bottom Images-view share action announces **Share page {number}** for the page currently on screen.
 - Format selector: **Show PDF** and **Show images**; announce the selected format.
 - Progress: **{operation}, {done} of {total} pages**; while preparing, announce the relevant preparing string.
 - Disable state: expose saving, sharing, and deleting as busy; announce completion or failure using the corresponding message above.
