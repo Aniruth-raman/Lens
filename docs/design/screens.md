@@ -9,6 +9,9 @@ The mockups include prototype-only state switchers and a 10-page limit example. 
 - Use the device safe areas. Every icon-only control has an accessibility label and a touch target of at least 44 dp.
 - Use 16 px body text, 14 px secondary text, 12 px captions, and 11 px only for non-essential metadata.
 - Show one visually dominant primary action per screen. Disable actions while their operation is in progress and expose busy/progress state to assistive technology.
+- Use a shared button hierarchy: **primary** is accent-filled, has an icon and label, is 52 dp tall, has rounded corners and subtle elevation; **secondary/tonal** uses a raised-surface fill and has an icon and label; **destructive** uses the destructive colour with an icon and label. Button targets are at least 48 dp; other actionable targets are at least 44 dp.
+- Use Ionicons `document-text-outline` for PDF, `images-outline` for images, and `share-outline` for sharing.
+- Keep sheets, dialogs, and fixed action bars above top and bottom safe areas. On both 3-button navigation and gesture navigation, no content or action may overlap the system navigation bar or gesture area. Rename and confirmation dialogs adjust to the keyboard and scroll internally when needed so no field or button is hidden. Dismissible dialogs close on scrim tap or Back.
 - Keep Review limited to naming and deleting scanned pages. Do not add editing tools.
 - Exports are copied to shared storage automatically: PDFs to Downloads/Lens and images to Pictures/Lens on Android; friendly named exports are visible in Files on iOS.
 
@@ -51,6 +54,12 @@ The mockups include prototype-only state switchers and a 10-page limit example. 
 - State plainly that copies already saved to Downloads or Pictures are not removed.
 - While deleting, prevent duplicate submission. On success, remove the card. On failure, keep the card and show an error.
 
+### Document options sheet
+
+- Use a bottom sheet with a drag handle, document name, then icon rows **Rename** and **Delete**, in that order. Show Delete in the destructive colour.
+- Each row is at least 48 dp tall and spans the sheet width. Do not show a Cancel button.
+- Dismiss on scrim tap, Back/back gesture, or swipe down. Keep all content above the system navigation bar and gesture area on 3-button and gesture navigation; apply the bottom safe-area inset to the sheet.
+
 ### Scanner result / error
 
 - If the scanner is cancelled or returns no pages, remain in Gallery without an error dialog.
@@ -63,6 +72,7 @@ The mockups include prototype-only state switchers and a 10-page limit example. 
 ### Initial review
 
 - Show an editable document name, the number of scanned pages, a vertical list of page previews, and fixed PDF/image actions.
+- Show each save action as an icon button with a title and one-line caption. PDF uses `document-text-outline`, **Save as PDF**, and **One PDF file · Saved to Downloads/Lens** on Android (on iOS, say it is available in Files). Images uses `images-outline`, **Save as images**, and **One image per page · Saved to Pictures/Lens** on Android (on iOS, say it is available in Files). PDF is primary; images is secondary/tonal.
 - A default name includes the date and time. The user can rename it before saving.
 - Each page has a numbered badge and a remove action. Removing a page updates the count and numbering. The final remaining page cannot be removed; explain that a document needs at least one page.
 - Do not impose a page limit or show a limit banner.
@@ -83,6 +93,7 @@ The mockups include prototype-only state switchers and a 10-page limit example. 
 
 - If saving the scan or requested export fails, remain in Review with the name and pages intact. Re-enable actions and show a concise error with a retry path.
 - A failure to copy a public export must not be reported as a lost scan. Tell the user that the document remains in Lens and which shared-storage copy could not be made.
+- Keep error content and actions within the dialog safe area; when the keyboard is open or space is limited, allow the message body to scroll while keeping actions reachable.
 
 ### Leaving Review
 
@@ -92,7 +103,20 @@ The mockups include prototype-only state switchers and a 10-page limit example. 
 
 ## Preview
 
-**Primary action:** Share PDF when a PDF exists; otherwise Save as PDF. Image pages can also be tapped to share that page.
+The Preview bottom bar has exactly one primary action in each ready, busy, or error state. Each share call shares one file only. Tapping an image page remains a shortcut to share that page.
+
+| Preview state | Single primary action | Secondary actions |
+| --- | --- | --- |
+| PDF only, ready | **Share PDF** (`share-outline`) | **Save as images** (`images-outline`) |
+| Images only, ready | **Share page {number}** (`share-outline`) for the page currently on screen | **Save as PDF** (`document-text-outline`) |
+| Both formats, PDF selected | **Share PDF** (`share-outline`) | PDF / Images selector; no save-format action |
+| Both formats, Images selected | **Share page {number}** (`share-outline`) for the page currently on screen | PDF / Images selector; no save-format action |
+| Saving a missing format | One disabled **Saving PDF…** or **Saving images…** progress action | Hide or disable other actions |
+| Opening the share sheet | One disabled **Opening share sheet…** progress action | Hide or disable other actions |
+| Retryable preview, save, or share error | **Try again** (`refresh-outline`) | Keep other available actions secondary |
+| Document missing | **Back to Gallery** | None |
+
+The Images-selected states always show the current page’s share action, including images-only documents. Sharing sends only that one image per call.
 
 The mockup’s **Add another format** means “save the missing format” when one format exists. When both exist, replace it with the PDF / Images selector; it must never create another copy.
 
@@ -100,26 +124,28 @@ The mockup’s **Add another format** means “save the missing format” when o
 
 - Show the document name and a loading indicator while the selected format opens. For a PDF, show page progress when the viewer reports it.
 - Keep share and format actions disabled until the selected format is ready.
+- Keep the bottom action area above the system navigation and gesture area. While the selected format loads, show one disabled primary progress action; do not leave another enabled primary action beside it.
 
 ### PDF only
 
-- Show the PDF viewer, document name, page count, **Share PDF**, and **Save as images**.
+- Show the PDF viewer, document name, page count, **Share PDF**, and **Save as images**. Bottom bar: **Share PDF** is the single primary action with the share icon; **Save as images** is secondary/tonal with the images icon.
 - **Save as images** creates only the missing image format, copies it to shared storage, then switches the preview to images. Do not offer “Save as PDF” or start PDF generation again.
 
 ### Images only
 
-- Show the image pages in a vertical viewer. Tapping a page shares that single page.
-- Show **Save as PDF** as the primary action. After it succeeds, switch to the PDF viewer; do not regenerate images. Tapping a page shares that page.
+- Show the image pages in a vertical viewer. Every page card has a visible share icon, and tapping the page remains a sharing shortcut. Both share only that page.
+- Track the one-based page currently on screen as the user scrolls. Keep a visible **Share page {number}** bottom action with the share icon, including when the document has only images.
+- Bottom bar: **Share page {number}** is the single primary action; **Save as PDF** is secondary/tonal with the PDF icon. After PDF creation succeeds, switch to PDF; do not regenerate images.
 
 ### PDF and images
 
 - Show a two-option PDF / Images selector, initially on PDF. Changing the selected format changes only the preview.
-- Keep **Share PDF** as the primary action while PDF is selected. When Images is selected, each page is a **Share page** action.
+- When PDF is selected, **Share PDF** is the single primary action. When Images is selected, show the current-page **Share page {number}** primary action and a visible share icon on every page card; tapping a page also shares it.
 - Do not show a format-creation action because both formats already exist. Do not create another copy when the user changes the selected format.
 
 ### Exporting a missing format
 
-- Show progress and disable conflicting actions while the missing format is being created.
+- Show one disabled primary progress action, **Saving PDF…** or **Saving images…**, and hide or disable conflicting actions while the missing format is being created.
 - On success, switch to the newly created format. On failure, keep the existing format usable and show a retryable error.
 - If the private export exists but its public copy fails, retain the document and explain that the copy is missing from Downloads/Lens or Pictures/Lens.
 
@@ -127,35 +153,29 @@ The mockup’s **Add another format** means “save the missing format” when o
 
 - Share PDF opens the native share sheet for the existing PDF. Share page opens it for the selected image only.
 - While the share sheet is opening, show a busy label and prevent another share request. If sharing is unavailable or fails, keep the preview and offer a retry.
+- While sharing, the single primary bottom-bar control becomes **Opening share sheet…** with a spinner and disabled state. On a retryable share error, show **Try again** as the only primary action in the error feedback; keep other available actions secondary.
 
 ### Preview / document errors
 
 - If PDF preview fails, retain the document title and show **Preview unavailable**, a short error, and **Try again**. Sharing and format creation remain available when their source files are available.
 - If a requested image cannot load, show a page-level unavailable placeholder; other pages remain usable.
 - If the document record is missing, show **Document not found** and **Back to Gallery** without a transient flash during deletion.
+- For a retryable PDF preview or save error, show one primary **Try again** action in the error feedback. Keep any other available action secondary, and keep the document title and error actions within safe areas.
 
 ### Delete
 
 - The delete action asks for confirmation and says that copies already saved to Downloads or Pictures remain there.
 - On success, return to Gallery. On failure, keep Preview open and show an error.
+- Confirmation dialogs follow the shared safe-area and keyboard rules; no confirm or cancel button may be hidden by system bars or the keyboard.
 
 ## Differences from merged Mobile screens
 
-These are specification gaps observed in the current Gallery, Review, and Preview implementations, including the merged M-1, M-4, M-5, and M-7 work. M-2 (removing the page limit) and M-6 (shared components) are separate planned tasks.
+These are the remaining specification gaps and Android device findings to resolve. The share and sheet changes below supersede the earlier tap-only image-sharing and Cancel-button decisions.
 
 | Area | Current merged behavior | Specified behavior |
 | --- | --- | --- |
-| Gallery load failure | `load` failure is logged and becomes an empty document list. | Show a recoverable load error and retry; never imply the Gallery is genuinely empty. |
-| Gallery count | Loading appears as “Loading...” in the count badge; the count uses “doc/docs” and filtered results do not show the total. | Keep loading in the loading state; spell out “document(s)” and show matching/total counts while filtered. |
-| Gallery option and error flows | Options use a native Alert; rename/delete failures use Alerts. The delete confirmation itself correctly says public copies remain. | Use the shared accessible dialog/sheet patterns from M-6, with a clear retry path and 44 dp targets. Keep the accurate public-copy warning. |
-| Scanner error | All scanner exceptions say “Scan failed” and “Could not open the document scanner.” | Use “Scanner unavailable” and the copy deck wording; cancellation or zero pages should return quietly to Gallery. |
-| Review page limit (M-2 pending) | Review still shows `n / 10` and a “10 page limit reached” banner. | Show the page count only; the product has no page limit. |
-| Review saving | Progress is shown, but page removal stays enabled and labels vary between “Exporting” and “Saving”. | Disable page removal too; use “Saving PDF” / “Saving images” consistently. |
-| Review saved warning and failures | The saved warning appears in an Alert. The store also reports private-format creation failures through the same warning path and navigates to Preview. | Identify the destination only for a public-copy failure. For private-format failure, keep the draft in Review with a retry. |
-| Preview format controls | PDF-only has “Save as images”, but after success the PDF remains selected. Both formats use “View images” / “View PDF” as a toggle button. Images-only uses “Create PDF” as the primary action and has no second action. | Switch to Images after image creation; use a PDF / Images selector when both exist; label the missing format “Save as PDF” / “Save as images”. Never regenerate an existing format. |
-| Preview terminology | Missing PDF is labeled “Create PDF”; operation dialogs say “Success”, “Failed to create PDF”, and “Failed to save images”. | Use “Save as PDF” / “Save as images” for creation and direct outcome copy without generic success messages. |
-| Preview loading / share | PDF has an activity indicator; image pages have no load-error state. Share uses Alerts for outcomes. | Disable conflicting actions while loading; show a page-level image error and retryable share feedback. |
-| Delete progress | Preview shows “Deleting document...” after the record disappears. | Keep a clear busy state and navigate only after successful deletion; preserve Preview on failure. |
-| Typography / targets | Several labels are 10–13 px; the Gallery options control is 28 dp with 6 dp hit slop. | Follow the Brand type scale; give every actionable target at least 44 dp. |
-| Date (M-7) | Uses device locale and includes the year outside the current year. | Matches the spec. |
+| Gallery load failure | The store logs a load failure and returns an empty document list. | Show a recoverable load error and Try again; do not imply the Gallery is empty. |
+| Gallery options sheet | On Android, the sheet is clipped by the system navigation area and Cancel cannot be tapped. | Use the safe-area-aware bottom sheet with drag handle, document name, and 48 dp icon rows Rename/Delete; omit Cancel and dismiss by scrim, Back gesture, or swipe down. |
+| Images view sharing | There is no visible share control; users must discover that tapping a page shares it. | Keep tap-to-share as a shortcut, add a share icon to each page card, and show a bottom Share page {number} primary action for the current visible page in every Images view. Each share call sends one image. |
+| Button hierarchy and safe areas | Action buttons look plain, and sheet/dialog controls can be obscured by system navigation or the keyboard. | Apply the icon-led primary/tonal/destructive hierarchy, 52 dp primary buttons, and safe-area/keyboard behavior for sheets, rename dialogs, and confirmation dialogs. Define exactly one primary Preview action in each ready, saving, sharing, and error state. |
 
