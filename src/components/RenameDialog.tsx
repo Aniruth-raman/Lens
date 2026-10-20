@@ -1,6 +1,7 @@
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors } from "../theme/colors";
 import { Button } from "./Button";
+import { ModalSafeArea } from "./ModalSafeArea";
 
 type Props = {
   visible: boolean;
@@ -16,8 +17,8 @@ type Props = {
 export function RenameDialog({ visible, value, onChangeText, onSave, onCancel, saving = false, error, errorTitle }: Props) {
   const canSave = !!value.trim() && !saving;
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.overlay}>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onCancel}>
+      <ModalSafeArea scrimColor={`${colors.background}B8`} onDismiss={onCancel}>
         <View accessibilityViewIsModal style={styles.dialog}>
           <Text accessibilityRole="header" style={styles.title}>Rename document</Text>
           <Text style={styles.fieldLabel}>Document name</Text>
@@ -40,13 +41,12 @@ export function RenameDialog({ visible, value, onChangeText, onSave, onCancel, s
           <Button onPress={onSave} disabled={!canSave} loading={saving} style={styles.save}>Save name</Button>
           <Button variant="secondary" onPress={onCancel} disabled={saving}>Cancel</Button>
         </View>
-      </KeyboardAvoidingView>
+      </ModalSafeArea>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: `${colors.background}B8`, justifyContent: "center", paddingHorizontal: 24 },
   dialog: { width: "100%", maxWidth: 380, alignSelf: "center", padding: 24, borderRadius: 24, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors["surface-raised"] },
   title: { color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: 18 },
   fieldLabel: { color: colors["text-muted"], fontSize: 14, marginBottom: 8 },

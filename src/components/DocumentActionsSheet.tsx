@@ -1,6 +1,8 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../theme/colors";
-import { Button } from "./Button";
+import { ModalSafeArea } from "./ModalSafeArea";
 
 type Props = {
   visible: boolean;
@@ -11,28 +13,40 @@ type Props = {
 };
 
 export function DocumentActionsSheet({ visible, documentName, onRename, onDelete, onClose }: Props) {
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderRelease: (_, gesture) => { if (gesture.dy > 50) onClose(); },
+  }), [onClose]);
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Pressable accessibilityLabel="Close document options" style={StyleSheet.absoluteFill} onPress={onClose} />
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
+      <ModalSafeArea align="bottom" scrimColor={`${colors.background}A6`} onDismiss={onClose} dismissLabel="Close document options">
         <View accessibilityViewIsModal style={styles.sheet}>
-          <View style={styles.handle} />
-          <Text accessibilityRole="header" style={styles.title}>Document options</Text>
-          <Text numberOfLines={1} style={styles.name}>{documentName}</Text>
-          <Button variant="secondary" onPress={onRename} style={styles.action}>Rename</Button>
-          <Button variant="destructive" onPress={onDelete} style={styles.action}>Delete</Button>
-          <Button variant="secondary" onPress={onClose}>Cancel</Button>
+          <View {...panResponder.panHandlers} style={styles.handleArea} accessibilityHint="Swipe down to close.">
+            <View style={styles.handle} />
+          </View>
+          <Text accessibilityRole="header" style={styles.name}>{documentName}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Rename" onPress={onRename} style={styles.row}>
+            <Ionicons name="create-outline" size={22} color={colors.text} />
+            <Text style={styles.rowText}>Rename</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Delete" onPress={onDelete} style={[styles.row, styles.deleteRow]}>
+            <Ionicons name="trash-outline" size={22} color={colors.destructive} />
+            <Text style={styles.deleteText}>Delete</Text>
+          </Pressable>
         </View>
-      </View>
+      </ModalSafeArea>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: `${colors.background}A6`, justifyContent: "flex-end" },
-  sheet: { paddingTop: 12, paddingHorizontal: 20, paddingBottom: 32, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors["surface-raised"] },
-  handle: { width: 36, height: 4, borderRadius: 4, backgroundColor: colors["text-muted"], alignSelf: "center", marginBottom: 18 },
-  title: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  name: { color: colors["text-muted"], fontSize: 14, marginTop: 4, marginBottom: 18 },
-  action: { marginBottom: 8 },
+  sheet: { paddingTop: 8, paddingHorizontal: 20, paddingBottom: 12, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors["surface-raised"] },
+  handleArea: { minHeight: 32, alignItems: "center", justifyContent: "center" },
+  handle: { width: 36, height: 4, borderRadius: 4, backgroundColor: colors["text-muted"] },
+  name: { color: colors.text, fontSize: 16, fontWeight: "600", marginTop: 8, marginBottom: 12 },
+  row: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 12, borderRadius: 12 },
+  rowText: { color: colors.text, fontSize: 16, fontWeight: "500" },
+  deleteRow: { marginBottom: 4 },
+  deleteText: { color: colors.destructive, fontSize: 16, fontWeight: "600" },
 });
