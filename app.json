@@ -25,9 +25,6 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.aniruth.lens"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "plugins": [
       [
         "react-native-document-scanner-plugin",
