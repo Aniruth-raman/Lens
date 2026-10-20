@@ -13,13 +13,13 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import DocumentScanner from "react-native-document-scanner-plugin";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import DocumentCard from "../components/DocumentCard";
 import { useDocumentsStore } from "../store/documentsStore";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList, ScannedDoc } from "../types";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { scanDocument } from "../services/scannerService";
 
 const { colors } = tailwindConfig;
 
@@ -58,15 +58,13 @@ export default function GalleryScreen() {
 
   const startScan = async () => {
     try {
-      const result = await DocumentScanner.scanDocument();
-      if (result.scannedImages && result.scannedImages.length > 0) {
-        navigation.navigate("Review", { images: result.scannedImages });
-      }
+      const result = await scanDocument();
+      if (result.status === "success") navigation.navigate("Review", { images: result.images });
     } catch (e) {
       console.error("Scan failed:", e);
       Alert.alert(
-        "Scan failed",
-        "Could not open the document scanner. Please try again.",
+        "Scanner unavailable",
+        "Lens couldn’t open the document scanner. Try again.",
       );
     }
   };
