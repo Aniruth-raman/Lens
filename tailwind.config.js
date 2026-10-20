@@ -1,35 +1,37 @@
 /** @type {import('tailwindcss').Config} */
-const colors = {
-  bg: "#111317",
-  surface: "#111317",
-  "surface-alt": "#1E2023",
-  surfaceContainerLow: "#17191E",
-  surfaceContainer: "#1E2023",
-  surfaceContainerHigh: "#282A2D",
-  surfaceContainerHighest: "#333538",
-  border: "#2A2E37",
-  outlineVariant: "#2A2E37",
-  outlineSubtle: "#2D333F",
-  accent: "#6366F1",
-  primary: "#6366F1",
-  primaryHover: "#5254DB",
-  primaryLight: "#8183FF",
-  onSurface: "#E2E2E6",
-  onSurfaceVariant: "#9EA1AA",
-  secondary: "#9EA1AA",
-  muted: "#6B7280",
-  destructive: "#EF4444",
-  warning: "#FFB783",
-  warningContainer: "#352115",
-  warningBorder: "#78350F",
+const { colors } = require("./src/theme/colors");
+// Keep existing screens building and styled until Mobile migrates their call sites.
+const legacyColors = {
+  bg: colors.background,
+  "surface-alt": colors["surface-raised"],
+  surfaceContainerLow: colors.surface,
+  surfaceContainer: colors["surface-raised"],
+  surfaceContainerHigh: colors["surface-high"],
+  surfaceContainerHighest: colors["surface-highest"],
+  border: colors.outline,
+  outlineVariant: colors.outline,
+  outlineSubtle: colors["outline-subtle"],
+  accent: colors.primary,
+  primaryHover: colors["primary-hover"],
+  primaryLight: colors["primary-light"],
+  onSurface: colors.text,
+  onSurfaceVariant: colors["text-muted"],
+  secondary: colors["text-muted"],
+  muted: colors["text-muted"],
+  warningContainer: colors["warning-container"],
+  warningBorder: colors["warning-outline"],
 };
+const tailwindColors = { ...colors, ...legacyColors };
 
 module.exports = {
   content: ["./App.tsx", "./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
-      colors,
+      colors: tailwindColors,
+      fontFamily: {
+        sans: ["Inter", "System"],
+      },
       borderRadius: {
         sm: 6,
         md: 10,
@@ -42,6 +44,5 @@ module.exports = {
     },
   },
   plugins: [],
-  // Raw values for RN props that do not accept className
-  colors,
+  colors: tailwindColors,
 };
