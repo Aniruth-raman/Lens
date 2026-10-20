@@ -38,8 +38,8 @@ export function RenameDialog({ visible, value, onChangeText, onSave, onCancel, s
           />
           {!!errorTitle && <Text accessibilityRole="alert" style={styles.errorTitle}>{errorTitle}</Text>}
           {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-          <Button onPress={onSave} disabled={!canSave} loading={saving} style={styles.save}>Save name</Button>
-          <Button variant="secondary" onPress={onCancel} disabled={saving}>Cancel</Button>
+          <Button icon="checkmark-outline" onPress={onSave} disabled={!canSave} loading={saving} style={styles.save}>Save name</Button>
+          <Button variant="secondary" icon="close-outline" onPress={onCancel} disabled={saving}>Cancel</Button>
         </View>
       </ModalSafeArea>
     </Modal>

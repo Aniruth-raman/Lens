@@ -140,7 +140,7 @@ export default function ReviewScreen() {
       <SafeAreaView className="flex-1 items-center justify-center bg-background px-6" edges={["top", "right", "bottom", "left"]}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <Text className="text-text text-lg font-semibold font-sans">No pages to save</Text>
-        <Button variant="secondary" onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>Back to Gallery</Button>
+        <Button variant="secondary" icon="arrow-back-outline" onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>Back to Gallery</Button>
       </SafeAreaView>
     );
   }
@@ -254,8 +254,8 @@ export default function ReviewScreen() {
           )}
 
           {/* Primary Action: Export as PDF */}
-          <Button onPress={() => handleSave("pdf")} disabled={exporting || savingMode !== null || retryingSavedDocument} loading={exporting && savingMode === "pdf"} style={{ marginBottom: 8 }}>Save as PDF</Button>
-          <Button variant="secondary" onPress={() => handleSave("images")} disabled={exporting || savingMode !== null || retryingSavedDocument} loading={exporting && savingMode === "images"}>Save as images</Button>
+          <Button icon="document-text-outline" caption={Platform.OS === "ios" ? "One PDF file · Available in Files" : "One PDF file · Saved to Downloads/Lens"} onPress={() => handleSave("pdf")} disabled={exporting || savingMode !== null || retryingSavedDocument} loading={exporting && savingMode === "pdf"} style={{ marginBottom: 8 }}>Save as PDF</Button>
+          <Button variant="secondary" icon="images-outline" caption={Platform.OS === "ios" ? "One image per page · Available in Files" : "One image per page · Saved to Pictures/Lens"} onPress={() => handleSave("images")} disabled={exporting || savingMode !== null || retryingSavedDocument} loading={exporting && savingMode === "images"}>Save as images</Button>
         </View>
       </KeyboardAvoidingView>
       <ConfirmDialog
@@ -272,6 +272,7 @@ export default function ReviewScreen() {
         title={notice?.title ?? ""}
         message={notice?.message ?? ""}
         confirmLabel={notice?.confirmLabel ?? "OK"}
+        confirmIcon={notice?.confirmLabel === "Try again" ? "refresh-outline" : undefined}
         onConfirm={() => notice?.onConfirm()}
         onCancel={notice?.cancelLabel === "" ? undefined : () => setNotice(null)}
         cancelLabel={notice?.cancelLabel ?? "Cancel"}

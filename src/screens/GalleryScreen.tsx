@@ -21,6 +21,7 @@ import { RenameDialog } from "../components/RenameDialog";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LogoMark } from "../theme/LogoMark";
 import { colors } from "../theme/colors";
+import { Button } from "../components/Button";
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, "Gallery">;
 
@@ -255,17 +256,8 @@ export default function GalleryScreen() {
         />
       )}
 
-      {/* Floating Action Button (FAB) */}
       <View className="absolute right-5 z-30" style={{ bottom: insets.bottom + 24 }}>
-        <TouchableOpacity
-          className="w-14 h-14 rounded-2xl bg-primary items-center justify-center"
-          onPress={startScan}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Scan document"
-        >
-          <Ionicons name="camera" size={26} color={colors.text} />
-        </TouchableOpacity>
+        <Button icon="camera-outline" accessibilityLabel="Scan document" onPress={startScan} style={{ width: 164 }}>Scan document</Button>
       </View>
 
       <DocumentActionsSheet

@@ -2,12 +2,17 @@ import { Modal, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme/colors";
 import { Button } from "./Button";
 import { ModalSafeArea } from "./ModalSafeArea";
+import type { ComponentProps } from "react";
+import { Ionicons } from "@expo/vector-icons";
+
+type IconName = ComponentProps<typeof Ionicons>["name"];
 
 type Props = {
   visible: boolean;
   title: string;
   message: string;
   confirmLabel: string;
+  confirmIcon?: IconName;
   onConfirm: () => void;
   onCancel?: () => void;
   cancelLabel?: string;
@@ -15,15 +20,15 @@ type Props = {
   loading?: boolean;
 };
 
-export function ConfirmDialog({ visible, title, message, confirmLabel, onConfirm, onCancel, cancelLabel = "Cancel", destructive = false, loading = false }: Props) {
+export function ConfirmDialog({ visible, title, message, confirmLabel, confirmIcon, onConfirm, onCancel, cancelLabel = "Cancel", destructive = false, loading = false }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onCancel}>
       <ModalSafeArea scrimColor={`${colors.background}B8`} onDismiss={onCancel}>
         <View accessibilityViewIsModal style={styles.dialog}>
           <Text accessibilityRole="header" style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
-          <Button variant={destructive ? "destructive" : "primary"} onPress={onConfirm} loading={loading} style={styles.confirm}>{confirmLabel}</Button>
-          {cancelLabel && onCancel && <Button variant="secondary" onPress={onCancel} disabled={loading}>{cancelLabel}</Button>}
+          <Button variant={destructive ? "destructive" : "primary"} icon={confirmIcon ?? (destructive ? "trash-outline" : "checkmark-outline")} onPress={onConfirm} loading={loading} style={styles.confirm}>{confirmLabel}</Button>
+          {cancelLabel && onCancel && <Button variant="secondary" icon="close-outline" onPress={onCancel} disabled={loading}>{cancelLabel}</Button>}
         </View>
       </ModalSafeArea>
     </Modal>
