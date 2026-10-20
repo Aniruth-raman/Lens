@@ -47,6 +47,15 @@ export default function GalleryScreen() {
     );
   }, [docs, searchQuery]);
 
+  const toggleSearch = () => {
+    if (showSearch) {
+      setSearchQuery("");
+      setShowSearch(false);
+    } else {
+      setShowSearch(true);
+    }
+  };
+
   const startScan = async () => {
     try {
       const result = await DocumentScanner.scanDocument({
@@ -153,7 +162,7 @@ export default function GalleryScreen() {
             </View>
             <TouchableOpacity
               className="w-8 h-8 rounded-full items-center justify-center hover:bg-surfaceContainer active:scale-95"
-              onPress={() => setShowSearch((prev) => !prev)}
+              onPress={toggleSearch}
               accessibilityRole="button"
               accessibilityLabel="Search documents"
             >
@@ -233,19 +242,34 @@ export default function GalleryScreen() {
             />
           </View>
           <Text className="text-base font-semibold text-white tracking-tight">
-            No documents yet
+            {searchQuery.trim()
+              ? `No results for “${searchQuery.trim()}”`
+              : "No documents yet"}
           </Text>
           <Text className="text-xs text-onSurfaceVariant mt-1.5 max-w-[220px] leading-relaxed text-center">
-            Tap the scan button below to digitize your first receipt, contract, or ID card.
+            {searchQuery.trim()
+              ? "Try another name or clear your search."
+              : "Tap the scan button below to digitize your first receipt, contract, or ID card."}
           </Text>
 
-          <View className="mt-8 flex-row items-center space-x-1.5 px-3 py-1.5 rounded-full bg-surfaceContainer border border-outlineVariant/60">
-            <Text className="text-onSurfaceVariant text-[11px] mr-1">Tap</Text>
-            <Ionicons name="camera-outline" size={13} color={colors.primaryLight} />
-            <Text className="text-onSurfaceVariant text-[11px] ml-1">
-              to scan your first doc
-            </Text>
-          </View>
+          {searchQuery.trim() ? (
+            <TouchableOpacity
+              className="mt-5 px-4 py-2 rounded-full bg-surfaceContainer border border-outlineVariant/60"
+              onPress={() => setSearchQuery("")}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Text className="text-white text-xs font-medium">Clear search</Text>
+            </TouchableOpacity>
+          ) : (
+            <View className="mt-8 flex-row items-center space-x-1.5 px-3 py-1.5 rounded-full bg-surfaceContainer border border-outlineVariant/60">
+              <Text className="text-onSurfaceVariant text-[11px] mr-1">Tap</Text>
+              <Ionicons name="camera-outline" size={13} color={colors.primaryLight} />
+              <Text className="text-onSurfaceVariant text-[11px] ml-1">
+                to scan your first doc
+              </Text>
+            </View>
+          )}
         </View>
       ) : (
         /* Documents Grid (2 columns) */
