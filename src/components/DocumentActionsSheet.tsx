@@ -21,20 +21,24 @@ export function DocumentActionsSheet({ visible, documentName, onRename, onDelete
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       <ModalSafeArea align="bottom" scrimColor={`${colors.background}A6`} onDismiss={onClose} dismissLabel="Close document options">
-        <View accessibilityViewIsModal style={styles.sheet}>
-          <View {...panResponder.panHandlers} style={styles.handleArea} accessibilityHint="Swipe down to close.">
-            <View style={styles.handle} />
+        {({ insets }) => (
+          <View accessibilityViewIsModal style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
+            <View {...panResponder.panHandlers}>
+              <View style={styles.handleArea} accessibilityHint="Swipe down to close.">
+                <View style={styles.handle} />
+              </View>
+              <Text accessibilityRole="header" style={styles.name}>{documentName}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Rename" onPress={onRename} style={styles.row}>
+              <Ionicons name="create-outline" size={22} color={colors.text} />
+              <Text style={styles.rowText}>Rename</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Delete" onPress={onDelete} style={[styles.row, styles.deleteRow]}>
+              <Ionicons name="trash-outline" size={22} color={colors.destructive} />
+              <Text style={styles.deleteText}>Delete</Text>
+            </Pressable>
           </View>
-          <Text accessibilityRole="header" style={styles.name}>{documentName}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Rename" onPress={onRename} style={styles.row}>
-            <Ionicons name="create-outline" size={22} color={colors.text} />
-            <Text style={styles.rowText}>Rename</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Delete" onPress={onDelete} style={[styles.row, styles.deleteRow]}>
-            <Ionicons name="trash-outline" size={22} color={colors.destructive} />
-            <Text style={styles.deleteText}>Delete</Text>
-          </Pressable>
-        </View>
+        )}
       </ModalSafeArea>
     </Modal>
   );
