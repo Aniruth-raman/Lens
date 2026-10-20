@@ -39,6 +39,7 @@ export default function PdfPreviewScreen() {
   const [sharing, setSharing] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "images" | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [previewFormat, setPreviewFormat] = useState<"pdf" | "images">("pdf");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(doc?.pageCount || 1);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -145,20 +146,23 @@ export default function PdfPreviewScreen() {
     );
   }
 
-  const showingPdf = !!doc.pdfUri;
   const hasImages = !!doc.imageUris?.length;
-  const formatActionLabel = hasImages
-    ? doc.pdfUri
-      ? "Export PDF again"
-      : "Export images again"
-    : "Save images";
+  const hasPdf = !!doc.pdfUri;
+  const hasBothFormats = hasPdf && hasImages;
+  const showingPdf = hasPdf && (!hasImages || previewFormat === "pdf");
+  const showFormatAction = !hasImages || hasPdf;
+  const formatActionLabel = hasBothFormats ? (showingPdf ? "View images" : "View PDF") : "Save as images";
 
   const handleExportAnotherFormat = () => {
-    void handleExport(doc.pdfUri && hasImages ? "pdf" : "images");
+    if (hasBothFormats) {
+      setPreviewFormat(showingPdf ? "images" : "pdf");
+      return;
+    }
+    void handleExport("images");
   };
 
   const renderPreview = () => {
-    if (doc.pdfUri) {
+    if (showingPdf) {
       if (pdfError) {
         return (
           <View className="flex-1 items-center justify-center px-6">
@@ -347,6 +351,7 @@ export default function PdfPreviewScreen() {
           )}
         </TouchableOpacity>
 
+        {showFormatAction && (
         <TouchableOpacity
           className={`w-full h-12 rounded-full border border-outlineSubtle bg-[#161920] flex-row items-center justify-center active:scale-[0.99] ${
             exportingFormat ? "opacity-50" : ""
@@ -367,7 +372,7 @@ export default function PdfPreviewScreen() {
           ) : (
             <>
               <Ionicons
-                name="images"
+                name={formatActionLabel === "View PDF" ? "document-text" : "images"}
                 size={18}
                 color="#E2E2E6"
                 style={{ marginRight: 6 }}
@@ -378,6 +383,7 @@ export default function PdfPreviewScreen() {
             </>
           )}
         </TouchableOpacity>
+        )}
       </View>
 
       {/* Delete Confirmation Modal Overlay (Material 3 Native-Style Dialog) */}
