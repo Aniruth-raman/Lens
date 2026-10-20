@@ -1,6 +1,7 @@
-import { View, Text, Image, TouchableOpacity } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ScannedDoc } from "../types";
+import { colors } from "../theme/colors";
 
 type Props = {
   doc: ScannedDoc;
@@ -9,95 +10,75 @@ type Props = {
   onMenuPress: () => void;
 };
 
-function formatDate(ts: number): string {
-  const date = new Date(ts);
-  const options: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-  };
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
   if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
   return date.toLocaleDateString(undefined, options);
 }
 
-export default function DocumentCard({
-  doc,
-  onPress,
-  onLongPress,
-  onMenuPress,
-}: Props) {
+export default function DocumentCard({ doc, onPress, onLongPress, onMenuPress }: Props) {
   const scannedDate = formatDate(doc.createdAt);
-  const pageLabel = `${doc.pageCount} p`;
+  const pageLabel = `${doc.pageCount} ${doc.pageCount === 1 ? "page" : "pages"}`;
 
   return (
-    <TouchableOpacity
-      className="flex-1 bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 flex flex-col active:scale-[0.98]"
-      onPress={onPress}
-      onLongPress={onLongPress}
-      activeOpacity={0.8}
-      accessibilityRole="button"
-      accessibilityLabel={`Document ${doc.name}, ${doc.pageCount} pages, scanned on ${scannedDate}`}
-    >
-      {/* Document Sheet Thumbnail Container (Portrait Aspect Ratio) */}
-      <View className="w-full aspect-[1/1.34] bg-[#0F1115] rounded-xl overflow-hidden relative border border-outlineVariant/80 p-2 items-center justify-center">
-        {doc.thumbUri ? (
-          <View className="w-full h-full bg-[#FAFAFA] rounded-md overflow-hidden shadow-inner">
-            <Image
-              source={{ uri: doc.thumbUri }}
-              className="w-full h-full"
-              resizeMode="cover"
-            />
-          </View>
-        ) : (
-          <View className="w-full h-full bg-[#FAFAFA] rounded-md p-2 flex flex-col justify-between shadow-inner">
-            <View className="space-y-1.5">
-              <View className="h-1.5 w-10 bg-neutral-900 rounded-full" />
-              <View className="h-1 w-16 bg-neutral-400 rounded-full mt-1" />
-              <View className="h-1 w-20 bg-neutral-300 rounded-full" />
-              <View className="h-1 w-14 bg-neutral-300 rounded-full" />
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${doc.name}, ${doc.pageCount} ${doc.pageCount === 1 ? "page" : "pages"}, scanned ${scannedDate}`}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        style={styles.openCard}
+      >
+        <View style={styles.paperFrame}>
+          {doc.thumbUri ? (
+            <Image source={{ uri: doc.thumbUri }} resizeMode="cover" style={styles.thumbnail} />
+          ) : (
+            <View style={styles.paperPlaceholder}>
+              <View style={styles.lines}>
+                <View style={[styles.line, styles.titleLine]} />
+                <View style={styles.line} />
+                <View style={[styles.line, styles.shortLine]} />
+                <View style={styles.line} />
+              </View>
             </View>
-            <View className="border-t border-neutral-200 pt-1 flex-row justify-between items-center">
-              <Text className="text-[7px] font-mono font-bold text-neutral-500">
-                LENS
-              </Text>
-              <Text className="text-[7px] font-mono text-neutral-400">
-                PAGE 1
-              </Text>
-            </View>
+          )}
+          <View style={styles.pageBadge}>
+            <Text style={styles.pageBadgeText}>{pageLabel}</Text>
           </View>
-        )}
-
-        {/* Options 3-dots trigger button (top-left) */}
-        <TouchableOpacity
-          className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/75 items-center justify-center border border-white/10"
-          onPress={onMenuPress}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-          accessibilityRole="button"
-          accessibilityLabel={`Options for ${doc.name}`}
-        >
-          <Ionicons name="ellipsis-horizontal" size={13} color="#E2E2E6" />
-        </TouchableOpacity>
-
-        {/* Page Count Badge (top-right) */}
-        <View className="absolute top-2 right-2 bg-black/75 px-1.5 py-0.5 rounded-md border border-white/10">
-          <Text className="text-[10px] font-medium text-gray-200">
-            {pageLabel}
-          </Text>
         </View>
-      </View>
-
-      {/* Info Metadata */}
-      <View className="pt-2 px-0.5">
-        <Text
-          className="text-xs font-semibold text-white truncate leading-tight"
-          numberOfLines={1}
-        >
-          {doc.name}
-        </Text>
-        <Text className="text-[11px] text-onSurfaceVariant mt-0.5">
-          {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"} · {scannedDate}
-        </Text>
-      </View>
-    </TouchableOpacity>
+        <View style={styles.details}>
+          <Text numberOfLines={1} style={styles.name}>{doc.name}</Text>
+          <Text style={styles.metadata}>{doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"} · {scannedDate}</Text>
+        </View>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Document options"
+        hitSlop={4}
+        onPress={onMenuPress}
+        style={styles.options}
+      >
+        <Ionicons name="ellipsis-horizontal" size={18} color={colors.text} />
+      </Pressable>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: { flex: 1, borderRadius: 18, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors.surface, overflow: "hidden" },
+  openCard: { padding: 10 },
+  paperFrame: { width: "100%", aspectRatio: 1 / 1.34, borderRadius: 12, overflow: "hidden", padding: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.outline },
+  thumbnail: { flex: 1, width: "100%", height: "100%", borderRadius: 6, backgroundColor: colors.paper },
+  paperPlaceholder: { flex: 1, padding: 12, borderRadius: 6, backgroundColor: colors.paper, justifyContent: "center" },
+  lines: { gap: 8 },
+  line: { width: "100%", height: 4, borderRadius: 4, backgroundColor: colors["text-muted"], opacity: 0.28 },
+  titleLine: { width: "65%", height: 6, backgroundColor: colors.text, opacity: 0.8 },
+  shortLine: { width: "72%" },
+  pageBadge: { position: "absolute", top: 8, right: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.background, opacity: 0.94 },
+  pageBadgeText: { color: colors.text, fontFamily: "Inter", fontSize: 11, fontWeight: "600" },
+  details: { paddingTop: 8, paddingHorizontal: 2 },
+  name: { color: colors.text, fontFamily: "Inter", fontSize: 14, fontWeight: "600" },
+  metadata: { color: colors["text-muted"], fontFamily: "Inter", fontSize: 12, marginTop: 3 },
+  options: { position: "absolute", top: 8, left: 8, width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22, backgroundColor: `${colors.background}D9`, borderWidth: 1, borderColor: colors.outline },
+});

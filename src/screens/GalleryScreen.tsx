@@ -10,18 +10,17 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import DocumentCard from "../components/DocumentCard";
 import { useDocumentsStore } from "../store/documentsStore";
-import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList, ScannedDoc } from "../types";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { scanDocument } from "../services/scannerService";
 import { DocumentActionsSheet } from "../components/DocumentActionsSheet";
 import { RenameDialog } from "../components/RenameDialog";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-
-const { colors } = tailwindConfig;
+import { LogoMark } from "../theme/LogoMark";
+import { colors } from "../theme/colors";
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, "Gallery">;
 
@@ -46,10 +45,9 @@ export default function GalleryScreen() {
   const [deleting, setDeleting] = useState(false);
 
   const filteredDocs = useMemo(() => {
-    if (!searchQuery.trim()) return docs;
-    return docs.filter((d) =>
-      d.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return docs;
+    return docs.filter((doc) => doc.name.toLowerCase().includes(query));
   }, [docs, searchQuery]);
 
   const toggleSearch = () => {
@@ -115,47 +113,37 @@ export default function GalleryScreen() {
     }
   };
 
-  const displayedCount = loading
-    ? "Loading..."
-    : `${filteredDocs.length} ${filteredDocs.length === 1 ? "doc" : "docs"}`;
+  const displayedCount = searchQuery.trim()
+    ? `${filteredDocs.length} of ${docs.length} documents`
+    : `${docs.length} ${docs.length === 1 ? "document" : "documents"}`;
 
   return (
-    <SafeAreaView className="flex-1 bg-surface" edges={["top", "right", "left"]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.surface} />
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "right", "left"]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
       {/* Top App Bar */}
       <View className="px-4 pt-2.5 pb-2">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center space-x-2.5">
-            <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2.5">
-              <MaterialIcons
-                name="document-scanner"
-                size={18}
-                color={colors.primaryLight}
-              />
-            </View>
-            <Text className="text-xl font-bold tracking-tight text-white">
+            <LogoMark size={32} style={{ marginRight: 10 }} />
+            <Text className="text-xl font-bold tracking-tight text-text font-sans">
               Lens
             </Text>
           </View>
 
           {/* Counter Badge & Search Icon */}
           <View className="flex-row items-center space-x-2">
-            <View className="px-2.5 py-0.5 rounded-full bg-surfaceContainerHighest border border-outlineVariant/70 mr-1">
-              <Text className="text-[11px] font-medium tracking-wide text-onSurfaceVariant">
-                {displayedCount}
-              </Text>
-            </View>
+            {!loading && <Text className="text-xs font-medium text-text-muted mr-1">{displayedCount}</Text>}
             <TouchableOpacity
-              className="w-8 h-8 rounded-full items-center justify-center hover:bg-surfaceContainer active:scale-95"
+              className="w-11 h-11 rounded-full items-center justify-center"
               onPress={toggleSearch}
               accessibilityRole="button"
-              accessibilityLabel="Search documents"
+              accessibilityLabel={showSearch ? "Clear search" : "Search documents"}
             >
               <Ionicons
                 name={showSearch ? "close" : "search"}
                 size={18}
-                color={colors.onSurfaceVariant}
+                color={colors["text-muted"]}
               />
             </TouchableOpacity>
           </View>
@@ -163,27 +151,27 @@ export default function GalleryScreen() {
 
         {/* Optional Search Bar Input */}
         {showSearch && (
-          <View className="mt-3 flex-row items-center bg-surfaceContainerLow border border-outlineVariant rounded-xl px-3 py-2">
+          <View className="mt-3 flex-row items-center bg-surface border border-outline rounded-xl px-3 py-2">
             <Ionicons
               name="search"
               size={16}
-              color={colors.onSurfaceVariant}
+              color={colors["text-muted"]}
               style={{ marginRight: 8 }}
             />
             <TextInput
-              className="flex-1 text-white text-xs p-0"
-              placeholder="Search by document name..."
-              placeholderTextColor={colors.onSurfaceVariant}
+              className="flex-1 text-text text-base p-0 font-sans"
+              placeholder="Search documents"
+              placeholderTextColor={colors["text-muted"]}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoFocus
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <TouchableOpacity onPress={() => setSearchQuery("")} className="w-11 h-11 items-center justify-center" accessibilityRole="button" accessibilityLabel="Clear search">
                 <Ionicons
                   name="close-circle"
                   size={16}
-                  color={colors.onSurfaceVariant}
+                  color={colors["text-muted"]}
                 />
               </TouchableOpacity>
             )}
@@ -199,19 +187,19 @@ export default function GalleryScreen() {
             {[1, 2, 3, 4].map((id) => (
               <View
                 key={id}
-                className="w-[48%] bg-surfaceContainerLow border border-outlineVariant rounded-2xl p-2.5 mb-3"
+                className="w-[48%] bg-surface border border-outline rounded-2xl p-2.5 mb-3"
               >
-                <View className="w-full aspect-[1/1.34] bg-surfaceContainer rounded-xl border border-outlineVariant/50 p-3 justify-between">
+                <View className="w-full aspect-[1/1.34] bg-surface-raised rounded-xl border border-outline p-3 justify-between">
                   <View className="space-y-2">
-                    <View className="h-2 w-12 bg-white/10 rounded-full" />
-                    <View className="h-1.5 w-24 bg-white/5 rounded-full mt-2" />
-                    <View className="h-1.5 w-20 bg-white/5 rounded-full mt-1.5" />
+                    <View className="h-2 w-12 bg-text/10 rounded-full" />
+                    <View className="h-1.5 w-24 bg-text/5 rounded-full mt-2" />
+                    <View className="h-1.5 w-20 bg-text/5 rounded-full mt-1.5" />
                   </View>
-                  <View className="h-1.5 w-10 bg-white/10 rounded-full" />
+                  <View className="h-1.5 w-10 bg-text/10 rounded-full" />
                 </View>
                 <View className="pt-2 px-1 space-y-1.5">
-                  <View className="h-2.5 w-24 bg-white/15 rounded-full" />
-                  <View className="h-2 w-16 bg-white/5 rounded-full mt-1.5" />
+                  <View className="h-2.5 w-24 bg-text/15 rounded-full" />
+                  <View className="h-2 w-16 bg-text/5 rounded-full mt-1.5" />
                 </View>
               </View>
             ))}
@@ -220,42 +208,30 @@ export default function GalleryScreen() {
       ) : filteredDocs.length === 0 ? (
         /* Empty State */
         <View className="flex-1 items-center justify-center px-4 pb-20">
-          <View className="w-16 h-16 rounded-3xl bg-surfaceContainer border border-outlineVariant items-center justify-center mb-4 shadow-sm">
-            <Ionicons
-              name="folder-open-outline"
-              size={30}
-              color={colors.primaryLight}
-            />
+          <View className="w-16 h-16 rounded-3xl bg-surface-raised border border-outline items-center justify-center mb-4">
+            <LogoMark size={52} />
           </View>
-          <Text className="text-base font-semibold text-white tracking-tight">
+          <Text className="text-base font-semibold text-text tracking-tight font-sans">
             {searchQuery.trim()
               ? `No results for “${searchQuery.trim()}”`
               : "No documents yet"}
           </Text>
-          <Text className="text-xs text-onSurfaceVariant mt-1.5 max-w-[220px] leading-relaxed text-center">
+          <Text className="text-sm text-text-muted mt-1.5 max-w-[220px] leading-relaxed text-center font-sans">
             {searchQuery.trim()
               ? "Try another name or clear your search."
-              : "Tap the scan button below to digitize your first receipt, contract, or ID card."}
+              : "Scan a document to save it here."}
           </Text>
 
           {searchQuery.trim() ? (
             <TouchableOpacity
-              className="mt-5 px-4 py-2 rounded-full bg-surfaceContainer border border-outlineVariant/60"
+              className="mt-5 px-4 py-2 rounded-full bg-surface-raised border border-outline min-h-[44px] items-center justify-center"
               onPress={() => setSearchQuery("")}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
             >
-              <Text className="text-white text-xs font-medium">Clear search</Text>
+              <Text className="text-text text-sm font-medium">Clear search</Text>
             </TouchableOpacity>
-          ) : (
-            <View className="mt-8 flex-row items-center space-x-1.5 px-3 py-1.5 rounded-full bg-surfaceContainer border border-outlineVariant/60">
-              <Text className="text-onSurfaceVariant text-[11px] mr-1">Tap</Text>
-              <Ionicons name="camera-outline" size={13} color={colors.primaryLight} />
-              <Text className="text-onSurfaceVariant text-[11px] ml-1">
-                to scan your first doc
-              </Text>
-            </View>
-          )}
+          ) : null}
         </View>
       ) : (
         /* Documents Grid (2 columns) */
@@ -282,13 +258,13 @@ export default function GalleryScreen() {
       {/* Floating Action Button (FAB) */}
       <View className="absolute right-5 z-30" style={{ bottom: insets.bottom + 24 }}>
         <TouchableOpacity
-          className="w-14 h-14 rounded-2xl bg-primary items-center justify-center shadow-lg shadow-primary/25 active:scale-95"
+          className="w-14 h-14 rounded-2xl bg-primary items-center justify-center"
           onPress={startScan}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Scan document"
         >
-          <Ionicons name="camera" size={26} color="white" />
+          <Ionicons name="camera" size={26} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -323,7 +299,7 @@ export default function GalleryScreen() {
         visible={!!docToDelete}
         title={deleteError ? "Couldn’t delete document" : "Delete document?"}
         message={deleteError ? "Try again." : `This removes “${docToDelete?.name ?? ""}” from Lens. Copies already saved to Downloads or Pictures will remain there.`}
-        confirmLabel="Delete from Lens"
+        confirmLabel={deleteError ? "Try again" : "Delete from Lens"}
         onConfirm={handleConfirmDelete}
         onCancel={() => { setDocToDelete(null); setDeleteError(false); }}
         destructive

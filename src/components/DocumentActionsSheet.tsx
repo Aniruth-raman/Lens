@@ -29,7 +29,7 @@ export function DocumentActionsSheet({ visible, documentName, onRename, onDelete
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  overlay: { flex: 1, backgroundColor: `${colors.background}A6`, justifyContent: "flex-end" },
   sheet: { paddingTop: 12, paddingHorizontal: 20, paddingBottom: 32, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors["surface-raised"] },
   handle: { width: 36, height: 4, borderRadius: 4, backgroundColor: colors["text-muted"], alignSelf: "center", marginBottom: 18 },
   title: { color: colors.text, fontSize: 18, fontWeight: "700" },

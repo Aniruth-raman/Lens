@@ -6,11 +6,9 @@ import ReviewScreen from "./src/screens/ReviewScreen";
 import PdfPreviewScreen from "./src/screens/PdfPreviewScreen";
 import { RootStackParamList } from "./src/types";
 import { useDocumentsStore } from "./src/store/documentsStore";
-import tailwindConfig from "./tailwind.config";
 import "./global.css";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-
-const { colors } = tailwindConfig;
+import { colors } from "./src/theme/colors";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
@@ -26,7 +24,7 @@ export default function App() {
         <Stack.Navigator
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
+            contentStyle: { backgroundColor: colors.background },
             animation: "slide_from_right",
           }}
         >

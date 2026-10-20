@@ -46,7 +46,7 @@ export function RenameDialog({ visible, value, onChangeText, onSave, onCancel, s
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.72)", justifyContent: "center", paddingHorizontal: 24 },
+  overlay: { flex: 1, backgroundColor: `${colors.background}B8`, justifyContent: "center", paddingHorizontal: 24 },
   dialog: { width: "100%", maxWidth: 380, alignSelf: "center", padding: 24, borderRadius: 24, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors["surface-raised"] },
   title: { color: colors.text, fontSize: 18, fontWeight: "700", marginBottom: 18 },
   fieldLabel: { color: colors["text-muted"], fontSize: 14, marginBottom: 8 },

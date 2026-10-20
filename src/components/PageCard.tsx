@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme/colors";
 
 type Props = {
@@ -13,7 +13,8 @@ type Props = {
 
 export function PageCard({ uri, pageNumber, onRemove, removeDisabled = false, onShare, shareDisabled = false }: Props) {
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [uri]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { setFailed(false); setLoaded(false); }, [uri]);
   const content = (
     <View style={styles.card}>
       <View style={styles.badge}><Text style={styles.badgeText}>Page {pageNumber}</Text></View>
@@ -33,7 +34,10 @@ export function PageCard({ uri, pageNumber, onRemove, removeDisabled = false, on
       {failed ? (
         <View style={styles.unavailable}><Text style={styles.unavailableText}>This page couldn’t be opened.</Text></View>
       ) : (
-        <Image source={{ uri }} onError={() => setFailed(true)} resizeMode="contain" style={styles.image} />
+        <>
+          <Image source={{ uri }} onLoad={() => setLoaded(true)} onError={() => setFailed(true)} resizeMode="contain" style={styles.image} />
+          {!loaded && <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.loadingText}>Loading page…</Text></View>}
+        </>
       )}
     </View>
   );
@@ -42,8 +46,8 @@ export function PageCard({ uri, pageNumber, onRemove, removeDisabled = false, on
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Share page ${pageNumber}`}
-      accessibilityState={{ disabled: shareDisabled, busy: shareDisabled }}
-      disabled={shareDisabled}
+      accessibilityState={{ disabled: shareDisabled || !loaded, busy: shareDisabled }}
+      disabled={shareDisabled || !loaded}
       onPress={onShare}
       style={shareDisabled && styles.dimmed}
     >
@@ -62,4 +66,6 @@ const styles = StyleSheet.create({
   dimmed: { opacity: 0.45 },
   unavailable: { flex: 1, justifyContent: "center", alignItems: "center", padding: 12 },
   unavailableText: { color: colors["text-muted"], textAlign: "center", fontSize: 14 },
+  loading: { ...StyleSheet.absoluteFill, justifyContent: "center", alignItems: "center" },
+  loadingText: { color: colors["text-muted"], fontSize: 14, marginTop: 8 },
 });
