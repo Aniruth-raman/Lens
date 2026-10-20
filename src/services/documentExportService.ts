@@ -1,9 +1,14 @@
 import * as Sharing from "expo-sharing";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { PermissionsAndroid, Platform } from "react-native";
 import ReactNativeBlobUtil from "react-native-blob-util";
 import { Paths, Directory, File } from "expo-file-system";
 import { safeFileName, uniqueFileName } from "./fileNames";
-import { PDF_PAGE_WIDTH_PT } from "./exportConfig";
+import {
+  PDF_JPEG_QUALITY,
+  PDF_MAX_IMAGE_EDGE,
+  PDF_PAGE_WIDTH_PT,
+} from "./exportConfig";
 
 export type ExportProgressCallback = (done: number, total: number) => void;
 export type PublishedUris = { pdf?: string; images?: Array<string | null> };
@@ -36,31 +41,6 @@ function mimeTypeFor(file: File): string {
   if (extension === "webp") return "image/webp";
   if (extension === "heic") return "image/heic";
   return "image/jpeg";
-}
-
-function jpegDimensions(bytes: Uint8Array): { width: number; height: number; components: number } {
-  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) {
-    throw new Error("PDF export currently requires JPEG scan pages.");
-  }
-  let offset = 2;
-  while (offset + 9 < bytes.length) {
-    if (bytes[offset] !== 0xff) {
-      offset += 1;
-      continue;
-    }
-    const marker = bytes[offset + 1];
-    const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
-    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
-      return {
-        height: (bytes[offset + 5] << 8) | bytes[offset + 6],
-        width: (bytes[offset + 7] << 8) | bytes[offset + 8],
-        components: bytes[offset + 9],
-      };
-    }
-    if (length < 2) break;
-    offset += length + 2;
-  }
-  throw new Error("Could not read the dimensions of a scanned page.");
 }
 
 async function copyFile(source: File, destination: File): Promise<void> {
@@ -128,6 +108,32 @@ async function offset(path: string): Promise<number> {
   return Number((await ReactNativeBlobUtil.fs.stat(path)).size);
 }
 
+async function preparePdfJpeg(source: File): Promise<{ file: File; width: number; height: number }> {
+  const context = ImageManipulator.manipulate(source.uri);
+  let image: Awaited<ReturnType<typeof context.renderAsync>> | undefined;
+  try {
+    image = await context.renderAsync();
+    const longEdge = Math.max(image.width, image.height);
+    if (longEdge > PDF_MAX_IMAGE_EDGE) {
+      const resizedWidth = image.width >= image.height ? PDF_MAX_IMAGE_EDGE : null;
+      const resizedHeight = image.height > image.width ? PDF_MAX_IMAGE_EDGE : null;
+      image.release();
+      image = undefined;
+      context.reset().resize({ width: resizedWidth, height: resizedHeight });
+      image = await context.renderAsync();
+    }
+
+    const result = await image.saveAsync({
+      format: SaveFormat.JPEG,
+      compress: PDF_JPEG_QUALITY,
+    });
+    return { file: new File(result.uri), width: result.width, height: result.height };
+  } finally {
+    image?.release();
+    context.release();
+  }
+}
+
 async function createPdf(sourceUris: string[], destination: File, onProgress?: ExportProgressCallback): Promise<void> {
   destination.parentDirectory.create({ intermediates: true, idempotent: true });
   if (destination.exists) destination.delete();
@@ -149,27 +155,31 @@ async function createPdf(sourceUris: string[], destination: File, onProgress?: E
 
   for (let index = 0; index < sourceUris.length; index += 1) {
     const source = new File(sourceUris[index]);
-    const dimensions = jpegDimensions(new Uint8Array(await source.bytes()));
-    const width = PDF_PAGE_WIDTH_PT;
-    const height = (width * dimensions.height) / dimensions.width;
-    const page = pageObject(index);
-    const image = imageObject(index);
-    const content = contentObject(index);
-    let objects = "";
-    offsets[page] = (await offset(path)) + objects.length;
-    objects += `${page} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width.toFixed(3)} ${height.toFixed(3)}] /Resources << /XObject << /Im${index + 1} ${image} 0 R >> >> /Contents ${content} 0 R >>\nendobj\n`;
-    offsets[image] = (await offset(path)) + objects.length;
-    const imageSize = Number((await ReactNativeBlobUtil.fs.stat(localPath(source.uri))).size);
-    const colorSpace = dimensions.components === 1 ? "/DeviceGray" : dimensions.components === 4 ? "/DeviceCMYK" : "/DeviceRGB";
-    objects += `${image} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${dimensions.width} /Height ${dimensions.height} /ColorSpace ${colorSpace} /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageSize} >>\nstream\n`;
-    await appendText(path, objects);
-    await ReactNativeBlobUtil.fs.appendFile(path, localPath(source.uri), "uri");
-    const streamTail = `\nendstream\nendobj\n`;
-    await appendText(path, streamTail);
-    offsets[content] = await offset(path);
-    const contentStream = `q\n${width.toFixed(3)} 0 0 ${height.toFixed(3)} 0 0 cm\n/Im${index + 1} Do\nQ\n`;
-    await appendText(path, `${content} 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`);
-    onProgress?.(index + 1, count);
+    let pdfPage: File | undefined;
+    try {
+      const prepared = await preparePdfJpeg(source);
+      pdfPage = prepared.file;
+      const width = PDF_PAGE_WIDTH_PT;
+      const height = (width * prepared.height) / prepared.width;
+      const page = pageObject(index);
+      const image = imageObject(index);
+      const content = contentObject(index);
+      let objects = "";
+      offsets[page] = (await offset(path)) + objects.length;
+      objects += `${page} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width.toFixed(3)} ${height.toFixed(3)}] /Resources << /XObject << /Im${index + 1} ${image} 0 R >> >> /Contents ${content} 0 R >>\nendobj\n`;
+      offsets[image] = (await offset(path)) + objects.length;
+      const imageSize = Number((await ReactNativeBlobUtil.fs.stat(localPath(pdfPage.uri))).size);
+      objects += `${image} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${prepared.width} /Height ${prepared.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageSize} >>\nstream\n`;
+      await appendText(path, objects);
+      await ReactNativeBlobUtil.fs.appendFile(path, localPath(pdfPage.uri), "uri");
+      await appendText(path, "\nendstream\nendobj\n");
+      offsets[content] = await offset(path);
+      const contentStream = `q\n${width.toFixed(3)} 0 0 ${height.toFixed(3)} 0 0 cm\n/Im${index + 1} Do\nQ\n`;
+      await appendText(path, `${content} 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`);
+      onProgress?.(index + 1, count);
+    } finally {
+      if (pdfPage?.exists) pdfPage.delete();
+    }
   }
 
   const xrefOffset = await offset(path);
