@@ -31,6 +31,8 @@ export default function PdfPreviewScreen() {
   const [pdfError, setPdfError] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [loadedPages, setLoadedPages] = useState<Set<number>>(() => new Set());
+  const [failedPages, setFailedPages] = useState<Set<number>>(() => new Set());
   const [total, setTotal] = useState(doc?.pageCount ?? 1);
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState<"pdf" | "images" | null>(null);
@@ -52,6 +54,7 @@ export default function PdfPreviewScreen() {
   const hasImages = !!doc?.imageUris?.length;
   const both = hasPdf && hasImages;
   const showPdf = hasPdf && (!hasImages || format === "pdf");
+  const currentImageReady = loadedPages.has(page) && !failedPages.has(page);
 
   const sharePdf = async () => {
     if (!doc?.pdfUri || sharing) return;
@@ -112,7 +115,7 @@ export default function PdfPreviewScreen() {
       {deleting ? <><ActivityIndicator color={colors.primary} /><Text className="text-text-muted text-sm mt-3">Deleting document…</Text></> : <>
         <Text accessibilityRole="header" className="text-text text-base font-semibold mb-1">Document not found</Text>
         <Text className="text-text-muted text-sm text-center mb-6">This document may have been removed.</Text>
-        <Button onPress={() => navigation.navigate("Gallery")}>Back to Gallery</Button>
+        <Button icon="arrow-back-outline" onPress={() => navigation.navigate("Gallery")}>Back to Gallery</Button>
       </>}
     </SafeAreaView>
   );
@@ -136,28 +139,45 @@ export default function PdfPreviewScreen() {
       {showPdf ? pdfError ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text accessibilityRole="header" className="text-text text-base font-semibold mb-4">Preview unavailable</Text>
-          <Button variant="secondary" onPress={() => { setPdfError(false); setPdfLoading(true); }}>Try again</Button>
         </View>
       ) : <View className="flex-1 bg-background p-3">
         {pdfLoading && <View className="absolute inset-0 z-10 items-center justify-center bg-background"><ActivityIndicator color={colors.primary} /><Text className="text-text-muted text-sm mt-3">Loading PDF…</Text></View>}
         <Pdf source={{ uri: doc.pdfUri! }} style={{ flex: 1, backgroundColor: colors.paper }} onLoadComplete={(count) => { setTotal(count); setPdfLoading(false); }} onPageChanged={(current, count) => { setPage(current); setTotal(count); }} onError={() => { setPdfLoading(false); setPdfError(true); }} />
         {!pdfLoading && <View className="absolute bottom-5 self-center rounded-full bg-surface-raised px-3 py-1"><Text className="text-text text-xs">Page {page} of {total}</Text></View>}
       </View> : hasImages ? (
-        <FlatList data={doc.imageUris} keyExtractor={(_, index) => String(index)} contentContainerClassName="px-4 py-3 pb-36" viewabilityConfig={viewabilityConfig} onViewableItemsChanged={onViewableItemsChanged} renderItem={({ item, index }) => <PageCard uri={item} pageNumber={index + 1} onShare={() => void sharePage(item)} shareDisabled={sharing || !!saving} />} />
+        <FlatList data={doc.imageUris} keyExtractor={(_, index) => String(index)} contentContainerClassName="px-4 py-3 pb-36" viewabilityConfig={viewabilityConfig} onViewableItemsChanged={onViewableItemsChanged} renderItem={({ item, index }) => <PageCard uri={item} pageNumber={index + 1} onImageLoad={() => setLoadedPages((previous) => new Set(previous).add(index + 1))} onImageError={() => setFailedPages((previous) => new Set(previous).add(index + 1))} onShare={() => void sharePage(item)} shareDisabled={sharing || !!saving} />} />
       ) : <View className="flex-1 items-center justify-center"><Text className="text-text-muted text-sm">No preview available.</Text></View>}
 
       <View className="bg-background border-t border-outline px-5 pt-3" style={{ paddingBottom: insets.bottom + 12 }}>
         {both && <View className="flex-row rounded-full border border-outline p-1 mb-2">
-          {(["pdf", "images"] as const).map((item) => <TouchableOpacity key={item} accessibilityRole="button" accessibilityLabel={item === "pdf" ? "PDF" : "Images"} accessibilityState={{ selected: format === item, disabled: !!saving }} disabled={!!saving} onPress={() => setFormat(item)} className={`min-h-[44px] flex-1 items-center justify-center rounded-full ${format === item ? "bg-surface-high" : ""}`}><Text className="text-text text-sm">{item === "pdf" ? "PDF" : "Images"}</Text></TouchableOpacity>)}
+          {(["pdf", "images"] as const).map((item) => <TouchableOpacity key={item} accessibilityRole="button" accessibilityLabel={item === "pdf" ? "PDF" : "Images"} accessibilityState={{ selected: format === item, disabled: !!saving }} disabled={!!saving} onPress={() => setFormat(item)} className={`min-h-[44px] flex-1 flex-row items-center justify-center rounded-full ${format === item ? "bg-surface-high" : ""}`}><Ionicons name={item === "pdf" ? "document-text-outline" : "images-outline"} size={18} color={colors.text} style={{ marginRight: 8 }} /><Text className="text-text text-sm">{item === "pdf" ? "PDF" : "Images"}</Text></TouchableOpacity>)}
         </View>}
-        {hasImages && !showPdf && <Button onPress={() => void sharePage(doc.imageUris![page - 1] ?? doc.imageUris![0])} loading={sharing} disabled={!!saving} style={{ marginBottom: 8 }}>{sharing ? "Opening share sheet…" : `Share page ${page}`}</Button>}
-        {!hasPdf && <Button variant={hasImages ? "secondary" : "primary"} onPress={() => void saveFormat("pdf")} loading={saving === "pdf"} disabled={!!saving || sharing} style={{ marginBottom: 8 }}>Save as PDF</Button>}
-        {hasPdf && !hasImages && <Button variant="secondary" onPress={() => void saveFormat("images")} loading={saving === "images"} disabled={!!saving || sharing} style={{ marginBottom: 8 }}>Save as images</Button>}
-        {hasPdf && showPdf && <Button onPress={() => void sharePdf()} loading={sharing} disabled={!!saving} style={{ marginBottom: 8 }}>{sharing ? "Opening share sheet…" : "Share PDF"}</Button>}
-        {saving && <Text accessibilityLiveRegion="polite" className="text-text-muted text-sm text-center">{saving === "pdf" ? "Saving PDF…" : "Saving images…"}</Text>}
+        {saving ? (
+          <Button icon={saving === "pdf" ? "document-text-outline" : "images-outline"} onPress={() => undefined} loading disabled>{saving === "pdf" ? "Saving PDF…" : "Saving images…"}</Button>
+        ) : sharing ? (
+          <Button icon="share-outline" onPress={() => undefined} loading disabled>Opening share sheet…</Button>
+        ) : pdfError && showPdf ? (
+          <>
+            <Button icon="refresh-outline" onPress={() => { setPdfError(false); setPdfLoading(true); }}>Try again</Button>
+            {hasPdf && <Button variant="secondary" icon="share-outline" onPress={() => void sharePdf()} style={{ marginTop: 8 }}>Share PDF</Button>}
+            {hasPdf && !hasImages && <Button variant="secondary" icon="images-outline" onPress={() => void saveFormat("images")} style={{ marginTop: 8 }}>Save as images</Button>}
+          </>
+        ) : showPdf && pdfLoading ? (
+          <Button icon="document-text-outline" onPress={() => undefined} loading disabled>Loading PDF…</Button>
+        ) : hasImages && !showPdf ? (
+          <>
+            <Button icon="share-outline" onPress={() => void sharePage(doc.imageUris![page - 1] ?? doc.imageUris![0])} disabled={!currentImageReady} style={{ marginBottom: 8 }}>Share page {page}</Button>
+            {!hasPdf && <Button variant="secondary" icon="document-text-outline" onPress={() => void saveFormat("pdf")} disabled={!currentImageReady}>Save as PDF</Button>}
+          </>
+        ) : hasPdf ? (
+          <>
+            <Button icon="share-outline" onPress={() => void sharePdf()} style={{ marginBottom: 8 }}>Share PDF</Button>
+            {!hasImages && <Button variant="secondary" icon="images-outline" onPress={() => void saveFormat("images")}>Save as images</Button>}
+          </>
+        ) : <Button icon="document-text-outline" onPress={() => void saveFormat("pdf")}>Save as PDF</Button>}
       </View>
       <ConfirmDialog visible={deleteDialog} title="Delete document?" message={`This removes “${doc.name}” from Lens. Copies already saved to Downloads or Pictures will remain there.`} confirmLabel="Delete from Lens" onConfirm={() => void confirmDelete()} onCancel={() => setDeleteDialog(false)} destructive loading={deleting} />
-      <ConfirmDialog visible={!!feedback} title={feedback?.title ?? ""} message={feedback?.message ?? ""} confirmLabel={feedback?.title === "Saved in Lens" ? "Continue" : "Try again"} onConfirm={() => { const action = feedback?.action; setFeedback(null); action?.(); }} cancelLabel="" />
+      <ConfirmDialog visible={!!feedback} title={feedback?.title ?? ""} message={feedback?.message ?? ""} confirmLabel={feedback?.title === "Saved in Lens" ? "Continue" : "Try again"} confirmIcon={feedback?.title === "Saved in Lens" ? "checkmark-outline" : "refresh-outline"} onConfirm={() => { const action = feedback?.action; setFeedback(null); action?.(); }} cancelLabel="" />
     </SafeAreaView>
   );
 }

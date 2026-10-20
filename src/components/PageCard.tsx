@@ -10,9 +10,11 @@ type Props = {
   removeDisabled?: boolean;
   onShare?: () => void;
   shareDisabled?: boolean;
+  onImageLoad?: () => void;
+  onImageError?: () => void;
 };
 
-export function PageCard({ uri, pageNumber, onRemove, removeDisabled = false, onShare, shareDisabled = false }: Props) {
+export function PageCard({ uri, pageNumber, onRemove, removeDisabled = false, onShare, shareDisabled = false, onImageLoad, onImageError }: Props) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { setFailed(false); setLoaded(false); }, [uri]);
@@ -48,7 +50,7 @@ export function PageCard({ uri, pageNumber, onRemove, removeDisabled = false, on
         <View style={styles.unavailable}><Text style={styles.unavailableText}>This page couldn’t be opened.</Text></View>
       ) : (
         <>
-          <Image source={{ uri }} onLoad={() => setLoaded(true)} onError={() => setFailed(true)} resizeMode="contain" style={styles.image} />
+          <Image source={{ uri }} onLoad={() => { setLoaded(true); onImageLoad?.(); }} onError={() => { setFailed(true); onImageError?.(); }} resizeMode="contain" style={styles.image} />
           {!loaded && <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.loadingText}>Loading page…</Text></View>}
         </>
       )}
