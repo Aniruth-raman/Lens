@@ -69,6 +69,20 @@ async function copyFile(source: File, destination: File): Promise<void> {
   await source.copy(destination);
 }
 
+async function copyMigrationFile(source: File, destination: File, id: string): Promise<void> {
+  const staging = new Directory(privateScansDir(), id, ".migration");
+  staging.create({ intermediates: true, idempotent: true });
+  const stagedFile = new File(staging, destination.name);
+  if (stagedFile.exists) stagedFile.delete();
+  await source.copy(stagedFile);
+  if (source.size === null || stagedFile.size !== source.size) {
+    if (stagedFile.exists) stagedFile.delete();
+    throw new Error(`Could not copy ${source.name} completely during document migration.`);
+  }
+  if (destination.exists) destination.delete();
+  await stagedFile.move(destination);
+}
+
 /** Copies a page set into durable private storage, one page at a time. */
 export async function persistSourcePages(
   id: string,
@@ -309,7 +323,52 @@ export function cleanupOrphanedScans(knownIds: Set<string>, activeIds: Set<strin
   }
 }
 
-/** Move existing iOS documents out of the Files-visible legacy scans folder. */
+/** Remove old iOS internals after the migrated index has been persisted. */
+export function cleanupLegacyIosDocuments(documents: Array<{
+  id: string; pageCount: number; sourceUris?: string[]; pdfUri?: string;
+}>): void {
+  if (Platform.OS !== "ios") return;
+  const legacyRoot = legacyScansDir();
+  const exportsDir = new Directory(Paths.document, "Lens");
+  for (const document of documents) {
+    const legacySource = new Directory(legacyRoot, document.id, "source");
+    const newSource = sourceDirFor(document.id);
+    const newSourcePrefix = `${newSource.uri.replace(/\/?$/, "/")}`;
+    if (legacySource.exists && newSource.exists &&
+      document.sourceUris?.length === document.pageCount &&
+      document.sourceUris.every((uri) => uri.startsWith(newSourcePrefix))) {
+      const newPageCount = newSource.list().filter((entry) => entry instanceof File).length;
+      if (newPageCount === document.pageCount) {
+        try { legacySource.delete(); }
+        catch (error) { console.warn("Could not remove migrated legacy pages:", error); }
+      }
+    }
+
+    const legacyPdf = new File(legacyRoot, `${document.id}.pdf`);
+    if (legacyPdf.exists && document.pdfUri?.startsWith(`${exportsDir.uri.replace(/\/?$/, "/")}`) && new File(document.pdfUri).exists) {
+      try { legacyPdf.delete(); }
+      catch (error) { console.warn("Could not remove migrated legacy PDF:", error); }
+    }
+
+    const staging = new Directory(privateScansDir(), document.id, ".migration");
+    if (staging.exists) {
+      try { staging.delete(); }
+      catch (error) { console.warn("Could not remove migration staging files:", error); }
+    }
+
+    const legacyDocumentDir = new Directory(legacyRoot, document.id);
+    if (legacyDocumentDir.exists && legacyDocumentDir.list().length === 0) {
+      try { legacyDocumentDir.delete(); }
+      catch (error) { console.warn("Could not remove empty legacy document directory:", error); }
+    }
+  }
+  if (legacyRoot.exists && legacyRoot.list().length === 0) {
+    try { legacyRoot.delete(); }
+    catch (error) { console.warn("Could not remove empty legacy scan directory:", error); }
+  }
+}
+
+/** Copy existing iOS documents out of the Files-visible legacy scans folder. */
 export async function migrateLegacyIosDocuments<T extends {
   id: string; name: string; pageCount: number; thumbUri: string;
   sourceUris?: string[]; imageUris?: string[]; pdfUri?: string;
@@ -333,16 +392,27 @@ export async function migrateLegacyIosDocuments<T extends {
       const oldPages = legacySource.list().filter((entry): entry is File => entry instanceof File)
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       if (oldPages.length === document.pageCount) {
+        const newSource = sourceDirFor(document.id);
+        if (newSource.exists) {
+          const newPages = newSource.list().filter((entry): entry is File => entry instanceof File)
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+          const complete = newPages.length === oldPages.length &&
+            newPages.every((page, index) => page.size !== null && page.size === oldPages[index].size);
+          if (!complete) newSource.delete();
+        }
         const sourceUris = await persistSourcePages(document.id, oldPages.map((file) => file.uri), document.pageCount);
         next = { ...next, sourceUris, thumbUri: sourceUris[0] };
-        if (document.imageUris) {
+        const exportPrefix = `${exportsDir.uri.replace(/\/?$/, "/")}`;
+        if (document.imageUris && !document.imageUris.every((uri) => uri.startsWith(exportPrefix))) {
           exportsDir.create({ intermediates: true, idempotent: true });
           const imageUris: string[] = [];
           for (let index = 0; index < sourceUris.length; index += 1) {
             const source = new File(sourceUris[index]);
-            const filename = `${safeFileName(document.name)}-page-${String(index + 1).padStart(3, "0")}${source.extension || ".jpg"}`;
-            const target = new File(exportsDir, uniqueFileName(filename.replace(/\.[^.]+$/, ""), await getExistingNames(exportsDir)) + (source.extension || ".jpg"));
-            await copyFile(source, target);
+            const filename = `${safeFileName(document.name)}-${document.id}-page-${String(index + 1).padStart(3, "0")}${source.extension || ".jpg"}`;
+            const target = new File(exportsDir, filename);
+            if (!target.exists || source.size === null || target.size !== source.size) {
+              await copyMigrationFile(source, target, document.id);
+            }
             imageUris.push(target.uri);
           }
           next.imageUris = imageUris;
@@ -352,16 +422,14 @@ export async function migrateLegacyIosDocuments<T extends {
 
     if (legacyPdf.exists) {
       exportsDir.create({ intermediates: true, idempotent: true });
-      const filename = `${safeFileName(document.name)}.pdf`;
-      const target = new File(exportsDir, `${uniqueFileName(filename.replace(/\.pdf$/i, ""), await getExistingNames(exportsDir))}.pdf`);
-      await copyFile(legacyPdf, target);
+      const target = new File(exportsDir, `${safeFileName(document.name)}-${document.id}.pdf`);
+      if (!target.exists || legacyPdf.size === null || target.size !== legacyPdf.size) {
+        await copyMigrationFile(legacyPdf, target, document.id);
+      }
       next.pdfUri = target.uri;
-      legacyPdf.delete();
     }
-    if (legacySource.exists && next.sourceUris) legacySource.delete();
-    changed = true;
+    if (JSON.stringify(next) !== JSON.stringify(document)) changed = true;
     migrated.push(next);
   }
-  if (legacyRoot.exists && legacyRoot.list().length === 0) legacyRoot.delete();
   return changed ? migrated : documents;
 }

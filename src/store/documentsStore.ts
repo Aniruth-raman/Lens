@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { ExportProgress, ExportMode, ScannedDoc } from "../types";
 import {
   cleanupOrphanedScans,
+  cleanupLegacyIosDocuments,
   deleteDocumentFiles,
   generatePdf,
   generateImages,
@@ -108,6 +109,7 @@ export const useDocumentsStore = create<DocumentsState>((set, get) => {
         const docs = await migrateLegacyIosDocuments(storedDocs);
         if (docs !== storedDocs) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
         set({ docs });
+        cleanupLegacyIosDocuments(docs);
         cleanupOrphanedScans(new Set(docs.map((doc) => doc.id)), activeIds);
       } catch (error) {
         console.error("Failed to load documents:", error);
