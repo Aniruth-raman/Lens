@@ -3,7 +3,6 @@ import {
   View,
   Text,
   FlatList,
-  Image,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -20,6 +19,9 @@ import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList } from "../types";
 import { defaultDocumentName } from "../services/fileNames";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button } from "../components/Button";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PageCard } from "../components/PageCard";
 
 const { colors } = tailwindConfig;
 
@@ -39,22 +41,13 @@ export default function ReviewScreen() {
   const [docName, setDocName] = useState(() => defaultDocumentName());
   const [savingMode, setSavingMode] = useState<"pdf" | "images" | null>(null);
   const [savedDocumentId, setSavedDocumentId] = useState<string | null>(null);
+  const [discardDialog, setDiscardDialog] = useState(false);
+  const [discardAction, setDiscardAction] = useState<(() => void) | null>(null);
   const saveInProgress = useRef(false);
 
   usePreventRemove(pages.length > 0 && !savedDocumentId, ({ data }) => {
-    Alert.alert(
-      "Discard this scan?",
-      "Your scanned pages will be lost if you leave Review.",
-      [
-        { text: "Keep reviewing", style: "cancel" },
-        {
-          text: "Discard scan",
-          style: "destructive",
-          onPress: () => navigation.dispatch(data.action),
-        },
-      ],
-      { cancelable: true },
-    );
+    setDiscardAction(() => () => navigation.dispatch(data.action));
+    setDiscardDialog(true);
   });
 
   useEffect(() => {
@@ -163,40 +156,12 @@ export default function ReviewScreen() {
           data={pages}
           keyExtractor={(uri) => uri}
           renderItem={({ item, index }) => (
-            <View className="relative bg-white text-gray-900 rounded-2xl shadow-xl border border-gray-200 overflow-hidden aspect-[1/1.34] p-4 flex-col justify-between mb-4">
-              {/* Page Number Badge (top-left) */}
-              <View className="absolute top-3 left-3 z-10 bg-black/85 px-2.5 py-0.5 rounded-full shadow-sm flex-row items-center">
-                <Text className="text-[11px] font-mono font-medium text-white">
-                  Page {index + 1}
-                </Text>
-              </View>
-
-              {/* Remove Page Button (top-right, >=44px touch target) */}
-              <TouchableOpacity
-                className="absolute top-1 right-1 z-10 w-11 h-11 items-center justify-center active:scale-95"
-                onPress={() => removePage(index)}
-                disabled={pages.length === 1}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove page ${index + 1}`}
-              >
-                <View
-                  className={`w-7 h-7 rounded-full bg-black/80 items-center justify-center shadow-md ${
-                    pages.length === 1 ? "opacity-30" : ""
-                  }`}
-                >
-                  <Ionicons name="close" size={16} color="white" />
-                </View>
-              </TouchableOpacity>
-
-              {/* Scanned Image Sheet Preview */}
-              <View className="w-full h-full items-center justify-center">
-                <Image
-                  source={{ uri: item }}
-                  className="w-full h-full rounded-md"
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
+            <PageCard
+              uri={item}
+              pageNumber={index + 1}
+              onRemove={() => removePage(index)}
+              removeDisabled={pages.length === 1 || exporting}
+            />
           )}
         />
 
@@ -244,50 +209,19 @@ export default function ReviewScreen() {
           )}
 
           {/* Primary Action: Export as PDF */}
-          <TouchableOpacity
-            className={`w-full h-12 rounded-full bg-accent flex-row items-center justify-center shadow-lg shadow-accent/25 active:scale-[0.99] mb-2.5 ${
-              exporting ? "opacity-50" : ""
-            }`}
-            onPress={() => handleSave("pdf")}
-            disabled={exporting || savingMode !== null}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Export as PDF"
-          >
-            <Ionicons
-              name="document-text"
-              size={19}
-              color="white"
-              style={{ marginRight: 8 }}
-            />
-            <Text className="text-white font-medium text-[14px]">
-              Export as PDF
-            </Text>
-          </TouchableOpacity>
-
-          {/* Secondary Action: Save as Images */}
-          <TouchableOpacity
-            className={`w-full h-12 rounded-full bg-[#161920] border border-outlineSubtle flex-row items-center justify-center active:scale-[0.99] ${
-              exporting ? "opacity-50" : ""
-            }`}
-            onPress={() => handleSave("images")}
-            disabled={exporting || savingMode !== null}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Save as Images"
-          >
-            <Ionicons
-              name="images"
-              size={19}
-              color={colors.onSurfaceVariant}
-              style={{ marginRight: 8 }}
-            />
-            <Text className="text-gray-200 font-medium text-[14px]">
-              Save as Images
-            </Text>
-          </TouchableOpacity>
+          <Button onPress={() => handleSave("pdf")} disabled={exporting || savingMode !== null} loading={exporting && savingMode === "pdf"} style={{ marginBottom: 8 }}>Save as PDF</Button>
+          <Button variant="secondary" onPress={() => handleSave("images")} disabled={exporting || savingMode !== null} loading={exporting && savingMode === "images"}>Save as images</Button>
         </View>
       </KeyboardAvoidingView>
+      <ConfirmDialog
+        visible={discardDialog}
+        title="Discard this scan?"
+        message="Your scanned pages will be lost if you leave Review."
+        confirmLabel="Discard scan"
+        onConfirm={() => { setDiscardDialog(false); discardAction?.(); }}
+        onCancel={() => setDiscardDialog(false)}
+        destructive
+      />
     </SafeAreaView>
   );
 }

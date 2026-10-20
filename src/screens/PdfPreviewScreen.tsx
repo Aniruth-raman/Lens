@@ -6,9 +6,7 @@ import {
   Alert,
   StatusBar,
   FlatList,
-  Image,
   ActivityIndicator,
-  Modal,
 } from "react-native";
 import Pdf from "react-native-pdf";
 import * as Sharing from "expo-sharing";
@@ -20,6 +18,9 @@ import { shareImage } from "../services/documentExportService";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList } from "../types";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button } from "../components/Button";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PageCard } from "../components/PageCard";
 
 const { colors } = tailwindConfig;
 
@@ -99,10 +100,10 @@ export default function PdfPreviewScreen() {
     try {
       if (format === "pdf") {
         await reExportPdf(id);
-        Alert.alert("Success", "PDF export created and saved.");
+        setPreviewFormat("pdf");
       } else {
         await reExportImages(id);
-        Alert.alert("Success", "Image exports created and saved to Pictures.");
+        setPreviewFormat("images");
       }
     } catch (error) {
       Alert.alert(
@@ -178,15 +179,12 @@ export default function PdfPreviewScreen() {
   const hasPdf = !!doc.pdfUri;
   const hasBothFormats = hasPdf && hasImages;
   const showingPdf = hasPdf && (!hasImages || previewFormat === "pdf");
-  const showFormatAction = !hasImages || hasPdf;
-  const formatActionLabel = hasBothFormats ? (showingPdf ? "View images" : "View PDF") : "Save as images";
-
   const handleExportAnotherFormat = () => {
     if (hasBothFormats) {
       setPreviewFormat(showingPdf ? "images" : "pdf");
       return;
     }
-    void handleExport("images");
+    void handleExport(hasPdf ? "images" : "pdf");
   };
 
   const renderPreview = () => {
@@ -266,28 +264,7 @@ export default function PdfPreviewScreen() {
           keyExtractor={(_, index) => String(index)}
           contentContainerClassName="px-4 py-3 pb-36"
           renderItem={({ item, index }) => (
-            <TouchableOpacity
-              className="relative bg-white text-gray-900 rounded-2xl shadow-xl border border-gray-200 overflow-hidden aspect-[1/1.34] p-3 flex-col justify-between mb-4"
-              onPress={() => void handleShareImage(item)}
-              disabled={sharing}
-              activeOpacity={0.88}
-              accessibilityRole="button"
-              accessibilityLabel={`Share page ${index + 1}`}
-              accessibilityState={{ disabled: sharing, busy: sharing }}
-            >
-              <View className="absolute top-3 left-3 z-10 bg-black/85 px-2.5 py-0.5 rounded-full shadow-sm flex-row items-center">
-                <Text className="text-[11px] font-mono font-medium text-white">
-                  Page {index + 1}
-                </Text>
-              </View>
-              <View className="w-full h-full items-center justify-center">
-                <Image
-                  source={{ uri: item }}
-                  className="w-full h-full rounded-md"
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableOpacity>
+            <PageCard uri={item} pageNumber={index + 1} onShare={() => void handleShareImage(item)} shareDisabled={sharing} />
           )}
         />
       );
@@ -355,129 +332,48 @@ export default function PdfPreviewScreen() {
         className="shrink-0 bg-[#111317]/95 border-t border-surfaceContainerHigh px-5 pt-3 flex-col space-y-2.5 z-20"
         style={{ paddingBottom: insets.bottom + 12 }}
       >
-        <TouchableOpacity
-          className={`w-full h-12 rounded-full bg-primary flex-row items-center justify-center shadow-lg shadow-primary/20 active:scale-[0.99] ${
-            sharing || exportingFormat ? "opacity-50" : ""
-          }`}
-          onPress={doc.pdfUri ? handleSharePdf : () => handleExport("pdf")}
-          disabled={sharing || !!exportingFormat}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel={doc.pdfUri ? "Share PDF" : "Create PDF"}
-        >
-          {sharing || exportingFormat === "pdf" ? (
-            <View className="flex-row items-center gap-2">
-              <ActivityIndicator color="white" size="small" />
-              <Text className="text-white font-medium text-sm ml-2">
-                {doc.pdfUri ? "Opening share sheet..." : "Creating PDF..."}
-              </Text>
-            </View>
-          ) : (
-            <>
-              <Ionicons
-                name={doc.pdfUri ? "share-outline" : "document-text"}
-                size={18}
-                color="white"
-                style={{ marginRight: 8 }}
-              />
-              <Text className="text-white font-medium text-sm">
-                {doc.pdfUri ? "Share PDF" : "Create PDF"}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {hasBothFormats ? (
+          <View className="flex-row rounded-full border border-outlineVariant p-1 mb-2">
+            {(["pdf", "images"] as const).map((format) => (
+              <TouchableOpacity
+                key={format}
+                accessibilityRole="button"
+                accessibilityLabel={format === "pdf" ? "Show PDF" : "Show images"}
+                accessibilityState={{ selected: previewFormat === format, disabled: !!exportingFormat }}
+                disabled={!!exportingFormat}
+                onPress={() => setPreviewFormat(format)}
+                className={`min-h-[44px] flex-1 items-center justify-center rounded-full ${previewFormat === format ? "bg-surfaceContainerHigh" : ""}`}
+              >
+                <Text className="text-white text-sm">{format === "pdf" ? "PDF" : "Images"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : hasPdf ? (
+          <Button variant="secondary" onPress={handleExportAnotherFormat} loading={exportingFormat === "images"} disabled={!!exportingFormat} style={{ marginBottom: 8 }}>Save as images</Button>
+        ) : null}
 
-        {showFormatAction && (
-        <TouchableOpacity
-          className={`w-full h-12 rounded-full border border-outlineSubtle bg-[#161920] flex-row items-center justify-center active:scale-[0.99] ${
-            exportingFormat ? "opacity-50" : ""
-          }`}
-          onPress={handleExportAnotherFormat}
-          disabled={!!exportingFormat}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel={formatActionLabel}
-        >
-          {exportingFormat === "images" ? (
-            <View className="flex-row items-center gap-2">
-              <ActivityIndicator color={colors.accent} size="small" />
-              <Text className="text-gray-200 font-medium text-sm ml-2">
-                Exporting images...
-              </Text>
-            </View>
-          ) : (
-            <>
-              <Ionicons
-                name={formatActionLabel === "View PDF" ? "document-text" : "images"}
-                size={18}
-                color="#E2E2E6"
-                style={{ marginRight: 6 }}
-              />
-              <Text className="text-gray-200 font-medium text-sm">
-                {formatActionLabel}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {(!hasBothFormats || showingPdf) && (
+          <Button
+            onPress={hasPdf ? handleSharePdf : () => void handleExport("pdf")}
+            disabled={sharing || !!exportingFormat}
+            loading={sharing || exportingFormat === "pdf"}
+            style={{ marginBottom: 8 }}
+          >
+            {hasPdf ? (sharing ? "Opening share sheet…" : "Share PDF") : (exportingFormat === "pdf" ? "Saving PDF…" : "Save as PDF")}
+          </Button>
         )}
       </View>
 
-      {/* Delete Confirmation Modal Overlay (Material 3 Native-Style Dialog) */}
-      <Modal
-        transparent
-        animationType="fade"
+      <ConfirmDialog
         visible={showDeleteModal}
-        onRequestClose={() => setShowDeleteModal(false)}
-      >
-        <View className="flex-1 bg-black/70 backdrop-blur-sm items-center justify-center px-6">
-          <View className="w-full max-w-[320px] bg-surfaceContainer border border-outlineVariant rounded-[24px] p-6 shadow-2xl flex-col">
-            {/* Dialog Icon & Headline */}
-            <View className="flex-row items-center mb-3">
-              <View className="w-10 h-10 rounded-full bg-red-500/15 items-center justify-center mr-3">
-                <MaterialIcons
-                  name="delete-outline"
-                  size={20}
-                  color={colors.destructive}
-                />
-              </View>
-              <Text className="text-lg font-semibold text-white tracking-tight flex-1">
-                Delete document?
-              </Text>
-            </View>
-
-            {/* Verbatim Warning Copy from Stitch Design */}
-            <Text className="text-xs text-onSurfaceVariant leading-relaxed mb-6">
-              Deletes this document from Lens. Copies already saved to Downloads
-              or Pictures are not removed.
-            </Text>
-
-            {/* Dialog Action Buttons */}
-            <View className="space-y-2">
-              <TouchableOpacity
-                className="w-full h-11 rounded-full bg-destructive items-center justify-center shadow-md shadow-destructive/25 mb-2"
-                onPress={handleDeleteDocument}
-                accessibilityRole="button"
-                accessibilityLabel="Delete from Lens"
-              >
-                <Text className="text-white text-xs font-semibold">
-                  Delete from Lens
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="w-full h-11 rounded-full bg-transparent border border-outlineVariant items-center justify-center"
-                onPress={() => setShowDeleteModal(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel"
-              >
-                <Text className="text-onSurfaceVariant text-xs font-medium">
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title="Delete document?"
+        message={`This removes “${doc.name}” from Lens. Copies already saved to Downloads or Pictures will remain there.`}
+        confirmLabel="Delete from Lens"
+        onConfirm={handleDeleteDocument}
+        onCancel={() => setShowDeleteModal(false)}
+        destructive
+        loading={deleting}
+      />
     </SafeAreaView>
   );
 }

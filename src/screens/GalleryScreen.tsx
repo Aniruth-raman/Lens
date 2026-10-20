@@ -6,10 +6,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-  Modal,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -20,6 +17,9 @@ import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList, ScannedDoc } from "../types";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { scanDocument } from "../services/scannerService";
+import { DocumentActionsSheet } from "../components/DocumentActionsSheet";
+import { RenameDialog } from "../components/RenameDialog";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 const { colors } = tailwindConfig;
 
@@ -36,9 +36,14 @@ export default function GalleryScreen() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [docToActions, setDocToActions] = useState<ScannedDoc | null>(null);
   const [docToRename, setDocToRename] = useState<ScannedDoc | null>(null);
   const [renameText, setRenameText] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
   const [docToDelete, setDocToDelete] = useState<ScannedDoc | null>(null);
+  const [deleteError, setDeleteError] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const filteredDocs = useMemo(() => {
     if (!searchQuery.trim()) return docs;
@@ -74,54 +79,39 @@ export default function GalleryScreen() {
   };
 
   const showDocOptions = (doc: ScannedDoc) => {
-    Alert.alert(doc.name, "Choose an action", [
-      {
-        text: "Rename",
-        onPress: () => {
-          setRenameText(doc.name);
-          setDocToRename(doc);
-        },
-      },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => setDocToDelete(doc),
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    setDocToActions(doc);
   };
 
   const handleConfirmDelete = async () => {
     if (!docToDelete) return;
+    setDeleting(true);
+    setDeleteError(false);
     try {
       await deleteDoc(docToDelete.id);
       setDocToDelete(null);
     } catch (error) {
       console.error("Failed to delete document:", error);
-      Alert.alert(
-        "Delete failed",
-        error instanceof Error
-          ? error.message
-          : "Could not remove this document. Please try again.",
-      );
+      setDeleteError(true);
+    } finally {
+      setDeleting(false);
     }
   };
 
   const submitRename = async () => {
     if (!docToRename) return;
     const trimmed = renameText.trim();
-    if (!trimmed) {
-      Alert.alert("Name required", "Please enter a valid document name.");
-      return;
-    }
+    if (!trimmed) return;
+    setRenameSaving(true);
+    setRenameError("");
     try {
       await renameDoc(docToRename.id, trimmed);
       setDocToRename(null);
+      setRenameText("");
     } catch (e) {
-      Alert.alert(
-        "Rename failed",
-        e instanceof Error ? e.message : "Could not rename document.",
-      );
+      console.error("Rename failed:", e);
+      setRenameError("Try again.");
+    } finally {
+      setRenameSaving(false);
     }
   };
 
@@ -302,118 +292,43 @@ export default function GalleryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Rename Modal */}
-      {docToRename && (
-        <Modal
-          transparent
-          animationType="fade"
-          visible={!!docToRename}
-          onRequestClose={() => setDocToRename(null)}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            className="flex-1 bg-black/70 items-center justify-center px-6"
-          >
-            <View className="w-full max-w-[320px] bg-surfaceContainer border border-outlineVariant rounded-[24px] p-6 shadow-2xl">
-              <View className="flex-row items-center mb-3">
-                <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2.5">
-                  <MaterialIcons name="edit" size={16} color={colors.primaryLight} />
-                </View>
-                <Text className="text-base font-semibold text-white tracking-tight">
-                  Rename Document
-                </Text>
-              </View>
-
-              <TextInput
-                className="bg-surfaceContainerHigh text-white border border-outlineVariant rounded-xl px-3.5 py-2.5 text-sm mb-4"
-                value={renameText}
-                onChangeText={setRenameText}
-                autoFocus
-                maxLength={60}
-                selectionColor={colors.accent}
-                accessibilityLabel="Document name input"
-              />
-
-              <View className="flex-row justify-end space-x-2">
-                <TouchableOpacity
-                  className="px-4 py-2 rounded-full border border-outlineVariant min-h-[40px] items-center justify-center mr-2"
-                  onPress={() => setDocToRename(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel rename"
-                >
-                  <Text className="text-onSurfaceVariant text-xs font-medium">
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="px-4 py-2 rounded-full bg-primary min-h-[40px] items-center justify-center"
-                  onPress={submitRename}
-                  accessibilityRole="button"
-                  accessibilityLabel="Save new document name"
-                >
-                  <Text className="text-white text-xs font-semibold">Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      )}
-
-      {/* Material 3 Styled Delete Dialog Modal */}
-      {docToDelete && (
-        <Modal
-          transparent
-          animationType="fade"
-          visible={!!docToDelete}
-          onRequestClose={() => setDocToDelete(null)}
-        >
-          <View className="flex-1 bg-black/70 backdrop-blur-sm items-center justify-center px-6">
-            <View className="w-full max-w-[320px] bg-surfaceContainer border border-outlineVariant rounded-[24px] p-6 shadow-2xl">
-              <View className="flex-row items-center mb-3">
-                <View className="w-10 h-10 rounded-full bg-red-500/15 items-center justify-center mr-3">
-                  <MaterialIcons
-                    name="delete-outline"
-                    size={20}
-                    color={colors.destructive}
-                  />
-                </View>
-                <Text className="text-lg font-semibold text-white tracking-tight flex-1">
-                  Delete document?
-                </Text>
-              </View>
-
-              <Text className="text-xs text-onSurfaceVariant leading-relaxed mb-6">
-                Deletes &ldquo;{docToDelete.name}&rdquo; from Lens. Copies already
-                saved to Downloads or Pictures are not removed.
-              </Text>
-
-              <View className="space-y-2">
-                <TouchableOpacity
-                  className="w-full h-11 rounded-full bg-destructive items-center justify-center shadow-md shadow-destructive/25 mb-2"
-                  onPress={handleConfirmDelete}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete from Lens"
-                >
-                  <Text className="text-white text-xs font-semibold">
-                    Delete from Lens
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  className="w-full h-11 rounded-full border border-outlineVariant items-center justify-center"
-                  onPress={() => setDocToDelete(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel"
-                >
-                  <Text className="text-onSurfaceVariant text-xs font-medium">
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
+      <DocumentActionsSheet
+        visible={!!docToActions}
+        documentName={docToActions?.name ?? ""}
+        onClose={() => setDocToActions(null)}
+        onRename={() => {
+          if (!docToActions) return;
+          setRenameText(docToActions.name);
+          setRenameError("");
+          setDocToRename(docToActions);
+          setDocToActions(null);
+        }}
+        onDelete={() => {
+          setDocToDelete(docToActions);
+          setDeleteError(false);
+          setDocToActions(null);
+        }}
+      />
+      <RenameDialog
+        visible={!!docToRename}
+        value={renameText}
+        onChangeText={setRenameText}
+        onSave={submitRename}
+        onCancel={() => setDocToRename(null)}
+        saving={renameSaving}
+        error={renameError}
+        errorTitle={renameError ? "Couldn’t rename document" : undefined}
+      />
+      <ConfirmDialog
+        visible={!!docToDelete}
+        title={deleteError ? "Couldn’t delete document" : "Delete document?"}
+        message={deleteError ? "Try again." : `This removes “${docToDelete?.name ?? ""}” from Lens. Copies already saved to Downloads or Pictures will remain there.`}
+        confirmLabel="Delete from Lens"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setDocToDelete(null); setDeleteError(false); }}
+        destructive
+        loading={deleting}
+      />
     </SafeAreaView>
   );
 }
