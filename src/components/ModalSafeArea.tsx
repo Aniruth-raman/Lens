@@ -15,12 +15,19 @@ export function ModalSafeArea({ children, align = "center", scrimColor, onDismis
     <SafeAreaProvider>
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={[styles.overlay, { backgroundColor: scrimColor }]}>
-          {onDismiss && <Pressable accessibilityRole="button" accessibilityLabel={dismissLabel} style={StyleSheet.absoluteFill} onPress={onDismiss} />}
+          {onDismiss && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={dismissLabel}
+              style={StyleSheet.absoluteFill}
+              onPress={onDismiss}
+            />
+          )}
           <View pointerEvents="box-none" style={styles.fill}>
             {align === "bottom" ? (
               <View pointerEvents="box-none" style={styles.bottomLayer}>
-                <SafeAreaView pointerEvents="box-none" edges={["bottom"]} style={styles.sheetSafeArea}>
-                  <View pointerEvents="box-none" style={styles.bottom}>{children}</View>
+                <SafeAreaView edges={["bottom"]} style={styles.sheetSafeArea}>
+                  {children}
                 </SafeAreaView>
               </View>
             ) : (
@@ -30,6 +37,7 @@ export function ModalSafeArea({ children, align = "center", scrimColor, onDismis
                   keyboardShouldPersistTaps="handled"
                   contentContainerStyle={[styles.content, styles.center]}
                 >
+                  {onDismiss && <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />}
                   {children}
                 </ScrollView>
               </SafeAreaView>
@@ -45,9 +53,16 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   overlay: { flex: 1 },
   safeArea: { flex: 1 },
-  sheetSafeArea: { backgroundColor: colors["surface-raised"] },
+  sheetSafeArea: {
+    width: "100%",
+    backgroundColor: colors["surface-raised"],
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderColor: colors.outline,
+    overflow: "hidden",
+  },
   content: { flexGrow: 1 },
   center: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 },
   bottomLayer: { flex: 1, justifyContent: "flex-end" },
-  bottom: { width: "100%" },
 });

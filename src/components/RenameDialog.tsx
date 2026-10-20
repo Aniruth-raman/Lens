@@ -1,4 +1,4 @@
-import { Modal, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors } from "../theme/colors";
 import { Button } from "./Button";
 import { ModalSafeArea } from "./ModalSafeArea";
@@ -49,7 +49,25 @@ export function RenameDialog({ visible, value, onChangeText, onSave, onCancel, s
 }
 
 const styles = StyleSheet.create({
-  dialog: { width: "100%", maxWidth: 320, alignSelf: "center", padding: 24, borderRadius: 24, borderWidth: 1, borderColor: colors["surface-high"], backgroundColor: colors["surface-raised"] },
+  dialog: {
+    width: "100%",
+    maxWidth: 320,
+    alignSelf: "center",
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors["surface-high"],
+    backgroundColor: colors["surface-raised"],
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000000",
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+      },
+      default: {},
+    }),
+  },
   title: { color: colors.text, fontSize: 18, fontWeight: "600", marginBottom: 18 },
   fieldLabel: { color: colors["text-muted"], fontSize: 14, marginBottom: 8 },
   input: { minHeight: 48, borderWidth: 1, borderColor: colors.outline, borderRadius: 12, color: colors.text, paddingHorizontal: 14, fontSize: 16, marginBottom: 12 },

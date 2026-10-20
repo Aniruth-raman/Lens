@@ -1,4 +1,4 @@
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme/colors";
 import { Button } from "./Button";
 import { ModalSafeArea } from "./ModalSafeArea";
@@ -28,7 +28,7 @@ export function ConfirmDialog({ visible, title, message, confirmLabel, onConfirm
           <Text style={styles.message}>{message}</Text>
           <View style={styles.actions}>
             <Button size="compact" variant={destructive ? "destructive" : "primary"} onPress={onConfirm} loading={loading}>{confirmLabel}</Button>
-            {cancelLabel && onCancel && <Button size="compact" variant="secondary" onPress={onCancel} disabled={loading}>{cancelLabel}</Button>}
+            {cancelLabel && onCancel ? <Button size="compact" variant="secondary" onPress={onCancel} disabled={loading}>{cancelLabel}</Button> : null}
           </View>
         </View>
       </ModalSafeArea>
@@ -37,7 +37,25 @@ export function ConfirmDialog({ visible, title, message, confirmLabel, onConfirm
 }
 
 const styles = StyleSheet.create({
-  dialog: { width: "100%", maxWidth: 320, alignSelf: "center", padding: 24, borderRadius: 24, borderWidth: 1, borderColor: colors["surface-high"], backgroundColor: colors["surface-raised"] },
+  dialog: {
+    width: "100%",
+    maxWidth: 320,
+    alignSelf: "center",
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors["surface-high"],
+    backgroundColor: colors["surface-raised"],
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000000",
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+      },
+      default: {},
+    }),
+  },
   heading: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconBadge: { width: 40, height: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 20, backgroundColor: `${colors.destructive}26` },
   title: { flex: 1, color: colors.text, fontSize: 18, lineHeight: 24, fontWeight: "600", letterSpacing: -0.3 },
