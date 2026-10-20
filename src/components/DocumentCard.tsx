@@ -10,10 +10,13 @@ type Props = {
 };
 
 function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString("en-US", {
+  const date = new Date(ts);
+  const options: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
-  });
+  };
+  if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+  return date.toLocaleDateString(undefined, options);
 }
 
 export default function DocumentCard({
