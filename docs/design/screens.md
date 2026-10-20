@@ -2,6 +2,8 @@
 
 These specs cover the Gallery, Review, and Preview screens. Use the Stitch images as visual intent: `screen_1_gallery_*.png`, `screen_2_review_*.png`, and `screen_3_preview_*.png`. Keep the dark palette and clear page previews, while following the current design tokens and minimum type and touch-target sizes.
 
+The mockups include prototype-only state switchers and a 10-page limit example. Do not build those controls or the limit. Keep the page cards, dark surfaces, fixed save/share actions, and confirmation dialog as visual references; apply the locked product decisions and the behavior below.
+
 ## Shared behavior
 
 - Use the device safe areas. Every icon-only control has an accessibility label and a touch target of at least 44 dp.
@@ -75,6 +77,7 @@ These specs cover the Gallery, Review, and Preview screens. Use the Stitch image
 - When either format is being saved, disable both format buttons and page removal. Keep the entered name and pages visible.
 - Show a determinate progress bar and “Saving PDF” or “Saving images” with completed pages / total pages when available. Before page work begins, show **Preparing PDF** or **Preparing images** with an activity indicator.
 - On completion, open Preview for the saved document. If the private document is saved but its public copy fails, show the relevant warning before continuing.
+- A private PDF/image creation failure is different from a public-copy failure. Keep the draft in Review and let the user retry; only show “Saved in Lens” when the requested private format was created and its public copy alone failed.
 
 ### Save error
 
@@ -91,6 +94,8 @@ These specs cover the Gallery, Review, and Preview screens. Use the Stitch image
 
 **Primary action:** Share PDF when a PDF exists; otherwise Save as PDF. Image pages can also be tapped to share that page.
 
+The mockup’s **Add another format** means “save the missing format” when one format exists. When both exist, replace it with the PDF / Images selector; it must never create another copy.
+
 ### Loading
 
 - Show the document name and a loading indicator while the selected format opens. For a PDF, show page progress when the viewer reports it.
@@ -104,7 +109,7 @@ These specs cover the Gallery, Review, and Preview screens. Use the Stitch image
 ### Images only
 
 - Show the image pages in a vertical viewer. Tapping a page shares that single page.
-- Show **Save as PDF** as the missing-format action. After it succeeds, switch to the PDF viewer; do not regenerate images.
+- Show **Save as PDF** as the primary action. After it succeeds, switch to the PDF viewer; do not regenerate images. Tapping a page shares that page.
 
 ### PDF and images
 
@@ -136,20 +141,21 @@ These specs cover the Gallery, Review, and Preview screens. Use the Stitch image
 
 ## Differences from merged Mobile screens
 
-These are specification gaps observed in M-1, M-4, M-5, and M-7; they are for Mobile to address in its screen work.
+These are specification gaps observed in the current Gallery, Review, and Preview implementations, including the merged M-1, M-4, M-5, and M-7 work. M-2 (removing the page limit) and M-6 (shared components) are separate planned tasks.
 
 | Area | Current merged behavior | Specified behavior |
 | --- | --- | --- |
-| Gallery load failure | `load` failure is logged and becomes an empty document list. | Show a recoverable load error and retry; never imply the gallery is genuinely empty. |
-| Gallery count/search | Loading appears as the count text “Loading...”; most visible copy is abbreviated (“docs”). | Keep loading in the loading state; show a clear matching/total count and spell out “documents”. |
-| Gallery actions | Document options are a native Alert; rename/delete failures use Alerts. | Use consistent, accessible dialogs/sheets with recoverable inline errors and 44 dp targets. |
-| Review page limit | Still shows `n / 10` and a “10 page limit reached” banner. | Show only the page count; there is no limit. |
-| Review saving | Progress is shown, but page removal stays enabled and the labels vary between “Exporting” and “Saving”. | Disable page removal too; use “Saving PDF” / “Saving images” consistently. |
-| Review saved warning | A public-copy warning appears in an Alert. | Identify the missing destination, retain the saved document, then continue to Preview. |
-| Preview format action | PDF-only says “Save as images”; once both exist it says “View images” / “View PDF”. Image-only has no missing-format secondary action and the primary says “Create PDF”. | Offer only the missing format with “Save as …” and switch to it on success. For both, use a PDF / Images selector. Never regenerate an existing format. |
-| Preview terminology | Missing PDF is labeled “Create PDF”; operation dialogs say “Success”, “Failed to create PDF”, and “Failed to save images”. | Use “Save as PDF” / “Save as images” for creation, and direct outcome copy without generic “Success”. |
-| Preview loading / share | PDF has an activity indicator; images have no page-level load error. Share uses Alerts for outcomes. | Disable actions until ready, show page-level image errors, and use consistent retryable share feedback. |
-| Delete progress | Preview shows “Deleting document...” after the record disappears. | Keep a clear busy state and navigate only after successful deletion; preserve the current screen on failure. |
-| Typography / targets | Several labels are 10–13 px; the Gallery options target is 28 dp (with hit slop). | Follow the Brand scale; all actionable targets must be at least 44 dp. |
-| Date | M-7 uses the locale and adds the year outside the current year. | Matches the spec. |
+| Gallery load failure | `load` failure is logged and becomes an empty document list. | Show a recoverable load error and retry; never imply the Gallery is genuinely empty. |
+| Gallery count | Loading appears as “Loading...” in the count badge; the count uses “doc/docs” and filtered results do not show the total. | Keep loading in the loading state; spell out “document(s)” and show matching/total counts while filtered. |
+| Gallery option and error flows | Options use a native Alert; rename/delete failures use Alerts. The delete confirmation itself correctly says public copies remain. | Use the shared accessible dialog/sheet patterns from M-6, with a clear retry path and 44 dp targets. Keep the accurate public-copy warning. |
+| Scanner error | All scanner exceptions say “Scan failed” and “Could not open the document scanner.” | Use “Scanner unavailable” and the copy deck wording; cancellation or zero pages should return quietly to Gallery. |
+| Review page limit (M-2 pending) | Review still shows `n / 10` and a “10 page limit reached” banner. | Show the page count only; the product has no page limit. |
+| Review saving | Progress is shown, but page removal stays enabled and labels vary between “Exporting” and “Saving”. | Disable page removal too; use “Saving PDF” / “Saving images” consistently. |
+| Review saved warning and failures | The saved warning appears in an Alert. The store also reports private-format creation failures through the same warning path and navigates to Preview. | Identify the destination only for a public-copy failure. For private-format failure, keep the draft in Review with a retry. |
+| Preview format controls | PDF-only has “Save as images”, but after success the PDF remains selected. Both formats use “View images” / “View PDF” as a toggle button. Images-only uses “Create PDF” as the primary action and has no second action. | Switch to Images after image creation; use a PDF / Images selector when both exist; label the missing format “Save as PDF” / “Save as images”. Never regenerate an existing format. |
+| Preview terminology | Missing PDF is labeled “Create PDF”; operation dialogs say “Success”, “Failed to create PDF”, and “Failed to save images”. | Use “Save as PDF” / “Save as images” for creation and direct outcome copy without generic success messages. |
+| Preview loading / share | PDF has an activity indicator; image pages have no load-error state. Share uses Alerts for outcomes. | Disable conflicting actions while loading; show a page-level image error and retryable share feedback. |
+| Delete progress | Preview shows “Deleting document...” after the record disappears. | Keep a clear busy state and navigate only after successful deletion; preserve Preview on failure. |
+| Typography / targets | Several labels are 10–13 px; the Gallery options control is 28 dp with 6 dp hit slop. | Follow the Brand type scale; give every actionable target at least 44 dp. |
+| Date (M-7) | Uses device locale and includes the year outside the current year. | Matches the spec. |
 

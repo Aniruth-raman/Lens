@@ -24,6 +24,7 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Load error action | Try again |
 | Scanner error title | Scanner unavailable |
 | Scanner error body | Lens couldn’t open the document scanner. Try again. |
+| Search field clear action (accessibility) | Clear search |
 | Document options | Document options |
 | Rename action | Rename |
 | Delete action | Delete |
@@ -40,6 +41,7 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Delete confirm | Delete from Lens |
 | Delete error title | Couldn’t delete document |
 | Delete error fallback | Try again. |
+| Delete progress | Deleting document… |
 
 ## Review
 
@@ -68,6 +70,7 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Save error title | Couldn’t save document |
 | Save PDF error fallback | The document is still in Review. Try saving the PDF again. |
 | Save images error fallback | The document is still in Review. Try saving the images again. |
+| Save error fallback when format is unknown | Your scan is still in Review. Try again. |
 | Public PDF warning title | Saved in Lens |
 | Public PDF warning | The PDF is saved in Lens, but couldn’t be copied to Downloads. You can try again from the document. |
 | Public images warning title | Saved in Lens |
@@ -97,6 +100,7 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Preview error title | Preview unavailable |
 | Preview retry | Try again |
 | Page error | This page couldn’t be opened. |
+| No preview available | No preview available. |
 | Missing document title | Document not found |
 | Missing document body | This document may have been removed. |
 | Delete action (icon accessibility) | Delete document |
@@ -115,6 +119,8 @@ Use these strings verbatim unless a platform requires a shorter accessibility la
 | Save PDF error title | Couldn’t save PDF |
 | Save images error title | Couldn’t save images |
 | Save error fallback | Your document is still in Lens. Try again. |
+| PDF preparation before page progress | Preparing PDF… |
+| Image preparation before page progress | Preparing images… |
 | Public PDF warning title | Saved in Lens |
 | Public PDF warning | The PDF is saved in Lens, but couldn’t be copied to Downloads. You can try again here. |
 | Public images warning title | Saved in Lens |
