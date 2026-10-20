@@ -16,6 +16,7 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useDocumentsStore } from "../store/documentsStore";
+import { shareImage } from "../services/documentExportService";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList } from "../types";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,6 +38,7 @@ export default function PdfPreviewScreen() {
   const deleteDoc = useDocumentsStore((s) => s.deleteDoc);
 
   const [sharing, setSharing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "images" | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [previewFormat, setPreviewFormat] = useState<"pdf" | "images">("pdf");
@@ -77,6 +79,21 @@ export default function PdfPreviewScreen() {
     }
   };
 
+  const handleShareImage = async (uri: string) => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      await shareImage(uri);
+    } catch (error) {
+      Alert.alert(
+        "Share failed",
+        error instanceof Error ? error.message : "Could not share this image.",
+      );
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const handleExport = async (format: "pdf" | "images") => {
     setExportingFormat(format);
     try {
@@ -100,16 +117,27 @@ export default function PdfPreviewScreen() {
   const handleDeleteDocument = async () => {
     if (!doc) return;
     try {
+      setDeleting(true);
       setShowDeleteModal(false);
       await deleteDoc(doc.id);
       navigation.navigate("Gallery");
     } catch (e) {
+      setDeleting(false);
       Alert.alert(
         "Delete failed",
         e instanceof Error ? e.message : "Could not delete document.",
       );
     }
   };
+
+  if (!doc && deleting) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-surface" edges={["top", "right", "bottom", "left"]}>
+        <ActivityIndicator color={colors.accent} />
+        <Text className="text-onSurfaceVariant text-sm mt-3">Deleting document...</Text>
+      </SafeAreaView>
+    );
+  }
 
   // Missing-document fallback
   if (!doc) {
@@ -238,7 +266,15 @@ export default function PdfPreviewScreen() {
           keyExtractor={(_, index) => String(index)}
           contentContainerClassName="px-4 py-3 pb-36"
           renderItem={({ item, index }) => (
-            <View className="relative bg-white text-gray-900 rounded-2xl shadow-xl border border-gray-200 overflow-hidden aspect-[1/1.34] p-3 flex-col justify-between mb-4">
+            <TouchableOpacity
+              className="relative bg-white text-gray-900 rounded-2xl shadow-xl border border-gray-200 overflow-hidden aspect-[1/1.34] p-3 flex-col justify-between mb-4"
+              onPress={() => void handleShareImage(item)}
+              disabled={sharing}
+              activeOpacity={0.88}
+              accessibilityRole="button"
+              accessibilityLabel={`Share page ${index + 1}`}
+              accessibilityState={{ disabled: sharing, busy: sharing }}
+            >
               <View className="absolute top-3 left-3 z-10 bg-black/85 px-2.5 py-0.5 rounded-full shadow-sm flex-row items-center">
                 <Text className="text-[11px] font-mono font-medium text-white">
                   Page {index + 1}
@@ -251,7 +287,7 @@ export default function PdfPreviewScreen() {
                   resizeMode="contain"
                 />
               </View>
-            </View>
+            </TouchableOpacity>
           )}
         />
       );
