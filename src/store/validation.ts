@@ -3,6 +3,15 @@ import type { ScannedDoc } from "../types";
 export function isScannedDoc(value: unknown): value is ScannedDoc {
   if (!value || typeof value !== "object") return false;
   const doc = value as Partial<ScannedDoc>;
+  const publishedUris = doc.publishedUris;
+  const publishedUrisValid =
+    publishedUris === undefined ||
+    (typeof publishedUris === "object" &&
+      publishedUris !== null &&
+      (publishedUris.pdf === undefined || typeof publishedUris.pdf === "string") &&
+      (publishedUris.images === undefined ||
+        (Array.isArray(publishedUris.images) &&
+          publishedUris.images.every((uri) => uri === null || typeof uri === "string"))));
   return (
     typeof doc.id === "string" &&
     typeof doc.name === "string" &&
@@ -22,12 +31,6 @@ export function isScannedDoc(value: unknown): value is ScannedDoc {
       (Array.isArray(doc.imageUris) &&
         doc.imageUris.every((uri) => typeof uri === "string" && !!uri))) &&
     (doc.pdfUri === undefined || typeof doc.pdfUri === "string") &&
-    (doc.publishedUris === undefined ||
-      (typeof doc.publishedUris === "object" &&
-        doc.publishedUris !== null &&
-        (doc.publishedUris.pdf === undefined || typeof doc.publishedUris.pdf === "string") &&
-        (doc.publishedUris.images === undefined ||
-          (Array.isArray(doc.publishedUris.images) &&
-            doc.publishedUris.images.every((uri) => typeof uri === "string")))))
+    publishedUrisValid
   );
 }

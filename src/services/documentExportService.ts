@@ -6,9 +6,9 @@ import { safeFileName, uniqueFileName } from "./fileNames";
 import { PDF_PAGE_WIDTH_PT } from "./exportConfig";
 
 export type ExportProgressCallback = (done: number, total: number) => void;
-export type PublishedUris = { pdf?: string; images?: string[] };
+export type PublishedUris = { pdf?: string; images?: Array<string | null> };
 export type GeneratedPdf = { uri: string; publishedUri?: string; warning?: string };
-export type GeneratedImages = { uris: string[]; publishedUris: string[]; warning?: string };
+export type GeneratedImages = { uris: string[]; publishedUris: Array<string | null>; warning?: string };
 
 function legacyScansDir(): Directory {
   return new Directory(Paths.document, "scans");
@@ -239,7 +239,8 @@ export async function publishPdf(id: string, docName: string, uri: string): Prom
     return { publishedUri };
   } catch (error) {
     console.warn("PDF is saved in Lens, but could not be copied to shared storage:", error);
-    return { warning: "Saved in Lens, but couldn't copy the PDF to shared storage." };
+    const destination = Platform.OS === "android" ? "Downloads/Lens" : "Files";
+    return { warning: `Saved in Lens, but couldn't copy the PDF to ${destination}.` };
   }
 }
 
@@ -249,10 +250,10 @@ export async function generateImages(
   pages?: string[],
   expectedPageCount?: number,
   onProgress?: ExportProgressCallback,
-  alreadyPublished: string[] = [],
+  alreadyPublished: Array<string | null> = [],
 ): Promise<GeneratedImages> {
   const uris = await persistSourcePages(id, pages, expectedPageCount);
-  const publishedUris: string[] = [];
+  const publishedUris: Array<string | null> = Array(uris.length).fill(null);
   let warning: string | undefined;
   for (let index = 0; index < uris.length; index += 1) {
     const file = new File(uris[index]);
@@ -269,7 +270,8 @@ export async function generateImages(
           ? await publishAndroid(file, displayName, "Image")
           : await publishIos(file, displayName);
       } catch (error) {
-        warning = "Saved in Lens, but couldn't copy all images to shared storage.";
+        const destination = Platform.OS === "android" ? "Pictures/Lens" : "Files";
+        warning = `Saved in Lens, but couldn't copy all images to ${destination}.`;
         console.warn(`Could not publish image ${index + 1}:`, error);
       }
     }
