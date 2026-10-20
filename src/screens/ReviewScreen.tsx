@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -12,12 +12,13 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, usePreventRemove, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useDocumentsStore } from "../store/documentsStore";
 import tailwindConfig from "../../tailwind.config";
 import { RootStackParamList } from "../types";
+import { defaultDocumentName } from "../services/fileNames";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { colors } = tailwindConfig;
@@ -32,17 +33,33 @@ export default function ReviewScreen() {
 
   const createDocument = useDocumentsStore((s) => s.createDocument);
   const exporting = useDocumentsStore((s) => s.exporting);
+  const exportProgress = useDocumentsStore((s) => s.exportProgress);
 
   const [pages, setPages] = useState<string[]>(route.params.images);
-  const [docName, setDocName] = useState(() => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `Scan ${yyyy}-${mm}-${dd}`;
-  });
+  const [docName, setDocName] = useState(() => defaultDocumentName());
   const [savingMode, setSavingMode] = useState<"pdf" | "images" | null>(null);
+  const [savedDocumentId, setSavedDocumentId] = useState<string | null>(null);
   const saveInProgress = useRef(false);
+
+  usePreventRemove(pages.length > 0 && !savedDocumentId, ({ data }) => {
+    Alert.alert(
+      "Discard this scan?",
+      "Your scanned pages will be lost if you leave Review.",
+      [
+        { text: "Keep reviewing", style: "cancel" },
+        {
+          text: "Discard scan",
+          style: "destructive",
+          onPress: () => navigation.dispatch(data.action),
+        },
+      ],
+      { cancelable: true },
+    );
+  });
+
+  useEffect(() => {
+    if (savedDocumentId) navigation.replace("PdfPreview", { id: savedDocumentId });
+  }, [navigation, savedDocumentId]);
 
   const removePage = (index: number) => {
     if (pages.length <= 1) {
@@ -71,7 +88,13 @@ export default function ReviewScreen() {
         imageUris: pages,
         exportMode: mode,
       });
-      navigation.replace("PdfPreview", { id: doc.id });
+      if (doc.exportWarning) {
+        Alert.alert("Saved in Lens", doc.exportWarning, [
+          { text: "OK", onPress: () => setSavedDocumentId(doc.id) },
+        ], { cancelable: false });
+      } else {
+        setSavedDocumentId(doc.id);
+      }
     } catch (e) {
       saveInProgress.current = false;
       setSavingMode(null);
@@ -157,7 +180,7 @@ export default function ReviewScreen() {
           className="flex-1"
           contentContainerClassName="px-5 py-4 pb-40"
           data={pages}
-          keyExtractor={(_, i) => String(i)}
+          keyExtractor={(uri) => uri}
           renderItem={({ item, index }) => (
             <View className="relative bg-white text-gray-900 rounded-2xl shadow-xl border border-gray-200 overflow-hidden aspect-[1/1.34] p-4 flex-col justify-between mb-4">
               {/* Page Number Badge (top-left) */}
@@ -208,16 +231,34 @@ export default function ReviewScreen() {
                 <View className="flex-row items-center space-x-1.5">
                   <View className="w-2 h-2 rounded-full bg-accent mr-2" />
                   <Text className="text-gray-200 font-medium text-xs">
-                    {savingMode === "pdf"
-                      ? "Exporting PDF..."
-                      : "Saving images..."}
+                    {exportProgress && exportProgress.total > 0
+                      ? savingMode === "pdf" ? "Exporting PDF..." : "Saving images..."
+                      : "Preparing export..."}
                   </Text>
                 </View>
+                {exportProgress && exportProgress.total > 0 && (
+                  <Text className="text-gray-300 text-xs">
+                    {exportProgress.done} / {exportProgress.total}
+                  </Text>
+                )}
                 <ActivityIndicator color={colors.accent} size="small" />
               </View>
-              <View className="w-full h-1.5 bg-surfaceContainer rounded-full overflow-hidden border border-outlineVariant">
-                <View className="h-full bg-accent rounded-full w-3/4" />
-              </View>
+              {exportProgress && exportProgress.total > 0 && (
+                <View
+                  className="w-full h-1.5 bg-surfaceContainer rounded-full overflow-hidden border border-outlineVariant"
+                  accessibilityRole="progressbar"
+                  accessibilityValue={{
+                    min: 0,
+                    max: exportProgress.total,
+                    now: exportProgress.done,
+                  }}
+                >
+                  <View
+                    className="h-full bg-accent rounded-full"
+                    style={{ width: `${Math.min(100, (exportProgress.done / exportProgress.total) * 100)}%` }}
+                  />
+                </View>
+              )}
             </View>
           )}
 
